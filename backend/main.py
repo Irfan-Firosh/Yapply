@@ -3,6 +3,7 @@ from routes.jwttoken import router, get_current_active_user
 from typing import Annotated
 import dotenv
 from routes.company import router as company_router
+import uvicorn
 
 dotenv.load_dotenv()
 
