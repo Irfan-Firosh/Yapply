@@ -1,0 +1,5 @@
+1. Can you walk me through a machine learning project you’ve worked on from start to finish?
+2. How do you decide which machine learning model to use for a given problem?
+3. What experience do you have with popular ML frameworks like TensorFlow or PyTorch?
+4. How do you approach evaluating the performance of an ML model?
+5. What recent developments in AI or ML excite you the most, and why?
