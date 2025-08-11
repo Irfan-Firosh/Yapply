@@ -109,9 +109,7 @@ async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm,
         raise HTTPException(status_code=401, detail="Incorrect username or password")
     access_token_expires = timedelta(minutes=int(os.getenv("TOKEN_EXPIRY_TIME")))
     data = {
-        "sub": company.username,
-        "role": "company",
-        "company_id": company.company_id
+        "sub": company.username
     }
     access_token = create_access_token(data=data, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
