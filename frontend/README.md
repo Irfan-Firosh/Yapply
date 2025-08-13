@@ -1,73 +1,130 @@
-# Welcome to your Lovable project
+# Yapply Frontend
 
-## Project info
+A modern React-based frontend application for AI-powered interview scheduling and management platform.
 
-**URL**: https://lovable.dev/projects/0e18efb8-158c-411c-bae2-b7d6eaa7d846
+## Overview
 
-## How can I edit this code?
+Yapply is an interview management system that allows companies to schedule AI-powered interviews with candidates using magic link authentication. The platform provides separate dashboards for companies and candidates with comprehensive interview tracking and evaluation features.
 
-There are several ways of editing your application.
+## Features
 
-**Use Lovable**
+### Company Features
+- **Company Authentication**: Secure login for company representatives
+- **Interview Scheduling**: Create and schedule interviews for candidates
+- **Dashboard Management**: View and manage all scheduled interviews
+- **Candidate Evaluation**: Access evaluation results and reports
+- **Credential Generation**: Generate secure access credentials for candidates
+- **Interview Deletion**: Remove interviews with confirmation dialog
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/0e18efb8-158c-411c-bae2-b7d6eaa7d846) and start prompting.
+### Candidate Features
+- **Magic Link Authentication**: Secure passwordless login via email links
+- **Interview Dashboard**: View scheduled interview details
+- **Invalid Link Handling**: User-friendly error pages for expired links
 
-Changes made via Lovable will be committed automatically to this repo.
+## Tech Stack
 
-**Use your preferred IDE**
+This project is built with modern web technologies:
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- **Frontend Framework**: React 18 with TypeScript
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS
+- **UI Components**: shadcn/ui component library
+- **Routing**: React Router v6
+- **State Management**: React Context API
+- **HTTP Client**: Fetch API
+- **Icons**: Lucide React
+- **Form Handling**: Custom form components
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Getting Started
 
-Follow these steps:
+### Prerequisites
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+- Node.js 18+ and npm installed
+- Git for version control
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Installation
 
-# Step 3: Install the necessary dependencies.
-npm i
+1. **Clone the repository**
+   ```sh
+   git clone git@github.com:Irfan-Firosh/Yapply-frontend.git
+   cd Yapply-frontend
+   ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+2. **Install dependencies**
+   ```sh
+   npm install
+   ```
+
+3. **Start the development server**
+   ```sh
+   npm run dev
+   ```
+
+4. **Open your browser**
+   Navigate to `http://localhost:5173`
+
+### Available Scripts
+
+- `npm run dev` - Start development server with hot reload
+- `npm run build` - Build the project for production
+- `npm run preview` - Preview the production build locally
+- `npm run lint` - Run ESLint for code quality checks
+
+## Project Structure
+
+```
+src/
+├── components/          # Reusable UI components
+│   ├── ui/             # shadcn/ui components
+│   ├── Navigation.tsx  # Navigation component
+│   └── ProtectedRoute.tsx
+├── contexts/           # React Context providers
+│   └── AuthContext.tsx
+├── hooks/              # Custom React hooks
+├── pages/              # Application pages/routes
+│   ├── AdminDashboard.tsx
+│   ├── CandidateDashboard.tsx
+│   ├── ScheduleInterview.tsx
+│   ├── InvalidLogin.tsx
+│   └── ...
+├── lib/                # Utility functions
+└── App.tsx            # Main application component
 ```
 
-**Edit a file directly in GitHub**
+## API Integration
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+The frontend integrates with a backend API for:
 
-**Use GitHub Codespaces**
+- Company authentication (`/api/company/`)
+- Interview management (`/api/company/interviews`)
+- Candidate authentication via magic links
+- Interview data retrieval and management
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Deployment
 
-## What technologies are used for this project?
+The application can be deployed to any static hosting service like:
 
-This project is built with:
+- Vercel
+- Netlify  
+- GitHub Pages
+- AWS S3 + CloudFront
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Build for Production
 
-## How can I deploy this project?
+```sh
+npm run build
+```
 
-Simply open [Lovable](https://lovable.dev/projects/0e18efb8-158c-411c-bae2-b7d6eaa7d846) and click on Share -> Publish.
+The built files will be in the `dist/` directory.
 
-## Can I connect a custom domain to my Lovable project?
+## Contributing
 
-Yes, you can!
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## License
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+This project is private and proprietary.
