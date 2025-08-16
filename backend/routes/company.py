@@ -9,8 +9,8 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from datetime import timedelta, timezone
 import jwt
 from jwt.exceptions import InvalidTokenError
-from db_functions.access_table import supabase
-from helper.company.gen_credentials import gen_credentials
+from db_functions.access_table import get_supabase_client
+from helper.company.gen_credentials import gen_magic_link
 import uuid
 
 dotenv.load_dotenv()
@@ -47,12 +47,7 @@ class InterviewBasic(BaseModel):
     status: str
     interview_date: date | None = None
     interview_time: time | None = None
-
-class InterviewLogin(InterviewBasic):
-    candidate_id: str | None = None
-    candidate_access_code: str | None = None
-
-class InterviewLink(InterviewLogin):
+class InterviewLink(InterviewBasic):
     transcript_link: str | None = None
 
 class InterviewCredentials(BaseModel):
@@ -62,7 +57,7 @@ class InterviewCredentials(BaseModel):
 
 
 company_oatuh2_scheme = OAuth2PasswordBearer(tokenUrl="company/token")
-
+supabase = get_supabase_client()
 
 def get_company(username: str):
     company_dict = supabase.table("company").select("*").eq("username", username).execute().data[0]
@@ -141,16 +136,32 @@ async def get_company_interview(interview_id: int, current_company: Annotated[Co
     interview = supabase.table("interviews").select("*").eq("id", interview_id).execute().data[0]
     return InterviewBasic(**interview)
 
-@router.get("/interviews/login/{interview_id}", summary="Get company interview login", response_model=InterviewLogin)
-async def get_company_interview_login(interview_id: int, current_company: Annotated[Company, Depends(get_current_active_company)]):
+@router.get("/interviews/{interview_id}/send-link", summary="Create company interview link")
+async def create_company_interview_link(interview_id: int, current_company: Annotated[Company, Depends(get_current_active_company)]):
+        interview = supabase.table("interviews").select("*").eq("id", interview_id).execute().data[0]
+        if not interview:
+            raise HTTPException(status_code=404, detail="Interview not found")
+        candidate_email = interview["candidate_email"]
+        gen_magic_link(candidate_email)
+        supabase.table("interviews").update({"magiclink_status": True}).eq("id", interview_id).execute()
+        return {"message": "Magic link sent to candidate"}
+
+@router.get("/interviews/{interview_id}/link-status", summary="Get company interview link")
+async def get_company_interview_link(interview_id: int, current_company: Annotated[Company, Depends(get_current_active_company)]):
     interview = supabase.table("interviews").select("*").eq("id", interview_id).execute().data[0]
-    return InterviewLogin(**interview)
+    return {"magiclink_status": interview["magiclink_status"]}
+
+@router.get("/interviews/transcript/{interview_id}", summary="Get company interview transcript", response_model=InterviewLink)
+async def get_company_interview_transcript(interview_id: int, current_company: Annotated[Company, Depends(get_current_active_company)]):
+    interview = supabase.table("interviews").select("*").eq("id", interview_id).execute().data[0]
+    return InterviewLink(**interview)
 
 @router.post("/interviews", summary="Create company interview", response_model=InterviewBasic)
 async def create_company_interview(
     current_company: Annotated[Company, Depends(get_current_active_company)],
     candidate_name: Annotated[str, Form()],
     candidate_phone: Annotated[str, Form()],
+    candidate_email: Annotated[str, Form()] = "",
     position: Annotated[str, Form()] = "",
     date: Annotated[date, Form()] = None,
     time: Annotated[time, Form()] = None
@@ -160,6 +171,7 @@ async def create_company_interview(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "status": "Pending",
         "candidate_name": candidate_name,
+        "candidate_email": candidate_email,
         "candidate_phone": candidate_phone,
         "position": position if position else None,
         "interview_date": date.isoformat() if date else None,
@@ -171,23 +183,10 @@ async def create_company_interview(
     else:
         raise HTTPException(status_code=400, detail="Failed to create interview")
 
-@router.patch("/interviews/generate/{interview_id}", summary="Update company interview", response_model=InterviewLogin)
-async def update_company_interview(
-    interview_id: int,
-    current_company: Annotated[Company, Depends(get_current_active_company)],
-    candidate_name: Annotated[str, Form()],
-    candidate_email: Annotated[str, Form()],
-    position: Annotated[str, Form()] = ""
-):
-    credentials = gen_credentials(current_company.company_id, datetime.now(timezone.utc))
-    update_data = {
-        "candidate_email": candidate_email,
-        "candidate_id": credentials[0],
-        "candidate_access_code": credentials[1],
-        "status": "Scheduled"
-    }
-    interview_result = supabase.table("interviews").update(update_data).eq("id", interview_id).execute().data
-    if interview_result:
-        return InterviewLogin(**interview_result[0])
+@router.delete("/interviews/{interview_id}", summary="Delete company interview")
+async def delete_company_interview(interview_id: int, current_company: Annotated[Company, Depends(get_current_active_company)]):
+    interview = supabase.table("interviews").delete().eq("id", interview_id).execute()
+    if interview:
+        return {"message": "Interview deleted successfully"}
     else:
-        raise HTTPException(status_code=404, detail="Interview not found or could not be updated")
+        raise HTTPException(status_code=404, detail="Interview not found")
