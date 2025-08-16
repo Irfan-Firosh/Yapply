@@ -1,18 +1,26 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCandidateAuth } from "@/contexts/CandidateAuthContext";
 
 interface NavigationProps {
   variant?: "landing" | "company" | "candidate";
 }
 
 const Navigation = ({ variant = "landing" }: NavigationProps) => {
+  const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
   const { logout, isAuthenticated } = useAuth();
+  const { logout: candidateLogout } = useCandidateAuth();
 
   const handleLogout = () => {
     logout();
+  };
+
+  const handleCandidateLogout = () => {
+    candidateLogout();
+    navigate("/");
   };
 
   if (variant === "landing") {
@@ -28,12 +36,6 @@ const Navigation = ({ variant = "landing" }: NavigationProps) => {
             className="nav-link"
           >
             Company Portal
-          </Link>
-          <Link 
-            to="/candidate/login" 
-            className="nav-link"
-          >
-            Candidate Login
           </Link>
         </div>
       </nav>
@@ -88,14 +90,7 @@ const Navigation = ({ variant = "landing" }: NavigationProps) => {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <Link to="/candidate/dashboard" className="text-xl font-semibold tracking-tight">
-              InterviewAI
-            </Link>
-            
-            <Link 
-              to="/candidate/login" 
-              className="nav-link"
-            >
-              Logout
+              Yapply
             </Link>
           </div>
         </div>

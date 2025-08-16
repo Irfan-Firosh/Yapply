@@ -6,7 +6,7 @@ import Navigation from "@/components/Navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, ExternalLink, Calendar, Users, FileText, TrendingUp, RefreshCw, Key, Trash2 } from "lucide-react";
+import { Plus, ExternalLink, Calendar, Users, FileText, TrendingUp, RefreshCw, Mail, Trash2 } from "lucide-react";
 
 interface Company {
   id: number;
@@ -29,6 +29,8 @@ interface InterviewBasic {
   interview_time: string | null;
 }
 
+
+
 const capitalizeFirst = str => str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
 
 
@@ -41,6 +43,7 @@ const AdminDashboard = () => {
   const [interviewsLoading, setInterviewsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [deletingInterviewId, setDeletingInterviewId] = useState<number | null>(null);
+
 
   // Cache keys
   const COMPANY_CACHE_KEY = 'company_data';
@@ -176,6 +179,7 @@ const AdminDashboard = () => {
       setInterviewsLoading(false);
     }
   };
+
 
   const deleteInterview = async (interviewId: number) => {
     if (!token) {
@@ -452,10 +456,10 @@ const AdminDashboard = () => {
                               Evaluation
                             </Button>
                           </Link>
-                          <Link to={`/company/credentials/${interview.id}`}>
+                          <Link to={`/company/magic-link/${interview.id}`}>
                             <Button variant="ghost" size="sm" className="flex items-center gap-2">
-                              <Key className="h-4 w-4" />
-                              Credentials
+                              <Mail className="h-4 w-4" />
+                              Magic Link
                             </Button>
                           </Link>
                           <AlertDialog>

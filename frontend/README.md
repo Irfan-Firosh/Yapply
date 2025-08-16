@@ -13,13 +13,13 @@ Yapply is an interview management system that allows companies to schedule AI-po
 - **Interview Scheduling**: Create and schedule interviews for candidates
 - **Dashboard Management**: View and manage all scheduled interviews
 - **Candidate Evaluation**: Access evaluation results and reports
-- **Credential Generation**: Generate secure access credentials for candidates
+- **Magic Link Authentication**: Send secure magic links to candidates for interview access
 - **Interview Deletion**: Remove interviews with confirmation dialog
 
 ### Candidate Features
-- **Magic Link Authentication**: Secure passwordless login via email links
-- **Interview Dashboard**: View scheduled interview details
-- **Invalid Link Handling**: User-friendly error pages for expired links
+- **Magic Link Authentication**: Secure passwordless login via email links (no credentials needed)
+- **Interview Dashboard**: View scheduled interview details and manage sessions
+
 
 ## Tech Stack
 
