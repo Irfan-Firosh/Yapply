@@ -1,26 +1,23 @@
-import random
-import string
-import hashlib
-from datetime import datetime
+from db_functions.access_table import supabase
 
-def gen_seed(company_id: str, timestamp: datetime):
-    seed = f"{company_id}{timestamp.isoformat()}"
-    hash = hashlib.sha256(seed.encode()).hexdigest()
-    return int(hash, 16) % (10 ** 8)
 
-def gen_candidate_id(rnd: random.Random) -> str:
-    prefix = ''.join(rnd.choices(string.ascii_uppercase, k=4))
-    number = rnd.randint(0, 999)
-    return f"{prefix}{number}"
+def gen_magic_link(email: str):
+    try:
+        res = supabase.auth.sign_in_with_otp({
+            "email": email,
+            "options": {
+                "emailRedirectTo": "http://localhost:8080/candidate/dashboard",
+                "shouldCreateUser": True
+            }
+        })
+        return res
+    except Exception as e:
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error message: {str(e)}")
+        if hasattr(e, 'response'):
+            print(f"Response status: {e.response.status_code}")
+            print(f"Response content: {e.response.text}")
+        raise e
 
-def gen_access_code(rnd: random.Random) -> str:
-    letters = ''.join(rnd.choices(string.ascii_uppercase, k=3))
-    digits = ''.join(rnd.choices(string.digits, k=3))
-    return f"{letters}{digits}"
-
-def gen_credentials(company_id: str, timestamp: datetime) -> tuple[str, str]:
-    if timestamp is None:
-        timestamp = datetime.now()
-    seed = gen_seed(company_id, timestamp)
-    rnd = random.Random(seed)
-    return gen_candidate_id(rnd), gen_access_code(rnd)
+if __name__ == "__main__":
+    print(gen_magic_link("itsmeo9806@gmail.com"))

@@ -3,6 +3,7 @@ from routes.jwttoken import router, get_current_active_user
 from typing import Annotated
 import dotenv
 from routes.company import router as company_router
+from routes.candidate import router as candidate_router
 import uvicorn
 
 dotenv.load_dotenv()
@@ -12,8 +13,12 @@ app = FastAPI()
 
 UNAUTHORIZED_USER = HTTPException(status_code=401, detail="Unauthorized")
 
+# Auth (demo) routes
 app.include_router(router)
+# Company routes
 app.include_router(company_router)
+# Candidate routes (Supabase magic-link/JWT protected)
+app.include_router(candidate_router)
 
 @app.get("/")
 async def read_root():
