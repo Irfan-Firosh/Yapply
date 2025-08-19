@@ -359,7 +359,7 @@ def create_automated_interview_workflow(
         },
         "artifactPlan": {
             "recordingEnabled": True,
-            "recordingFormat": "wav"
+            "recordingFormat": "wav;l16"
         }
     }
     
@@ -371,15 +371,8 @@ def post_workflow(workflow: Dict[str, Any]):
         "Content-Type": "application/json"
     }
 
-    data = json.dumps(workflow)
-
-    response = requests.post("https://api.vapi.ai/workflow", headers=headers, json=data)
-    return response.json()
-
-
-def save_workflow(workflow: Dict[str, Any], filename: str):
-    with open(filename, 'w') as f:
-        json.dump(workflow, f, indent=2)
+    response = requests.post("https://api.vapi.ai/workflow", headers=headers, json=workflow)
+    return response.json()["id"]
 
 
 if __name__ == "__main__":
