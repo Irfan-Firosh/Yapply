@@ -190,3 +190,6 @@ async def delete_company_interview(interview_id: int, current_company: Annotated
         return {"message": "Interview deleted successfully"}
     else:
         raise HTTPException(status_code=404, detail="Interview not found")
+
+@router.post("/create-interview/", summary="Create interview", response_model=str)
+async def create_inte
