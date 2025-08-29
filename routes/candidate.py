@@ -93,4 +93,3 @@ async def get_company_name(current_candidate: Annotated[Candidate, Depends(get_c
 
 
 
-
