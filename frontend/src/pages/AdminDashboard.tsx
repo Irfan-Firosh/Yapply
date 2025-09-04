@@ -54,7 +54,7 @@ interface Role {
   id: number;
   title: string;
   department: string;
-  questions: any[];
+  questions?: any[]; // optional: backend may not include this
 }
 
 const capitalizeFirst = (str) =>
@@ -155,7 +155,7 @@ const AdminDashboard = () => {
       : 0;
   const totalRoles = roles.length;
   const totalQuestions = roles.reduce(
-    (sum, role) => sum + role.questions.length,
+    (sum, role) => sum + (Array.isArray(role.questions) ? role.questions.length : 0),
     0
   );
 

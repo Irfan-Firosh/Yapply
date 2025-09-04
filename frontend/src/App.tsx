@@ -11,12 +11,12 @@ import LandingPage from "./pages/LandingPage";
 import CompanyLogin from "./pages/CompanyLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import ScheduleInterview from "./pages/ScheduleInterview";
-import RoleManagement from "./pages/RoleManagement";
 import CandidateEvaluation from "./pages/CandidateEvaluation";
 import CandidateDashboard from "./pages/CandidateDashboard";
 import MagicLinkSender from "./pages/MagicLinkSender";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
+import RoleManagement from "./pages/RoleManagement";
 
 const queryClient = new QueryClient();
 

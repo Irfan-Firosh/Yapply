@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -44,25 +45,26 @@ import {
   Briefcase,
   Users,
   PlusCircle,
-  X,
+  Mic,
+  MicOff,
+  Loader2,
 } from "lucide-react";
 
 interface Role {
-  id: number;
+  id?: number;
   title: string;
   description: string;
   department: string;
   requirements: string;
-  created_at: string;
-  questions: Question[];
+  created_at?: string;
+  questions?: Question[];
+  vapi_workflow_id?: string | null;
 }
 
 interface Question {
   id: number;
   question_text: string;
-  question_type: "text" | "multiple_choice" | "coding" | "behavioral";
-  options?: string[];
-  correct_answer?: string;
+  question_type: "text" | "coding" | "behavioral";
   difficulty: "easy" | "medium" | "hard";
   role_id: number;
 }
@@ -73,12 +75,15 @@ const RoleManagement = () => {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddRoleOpen, setIsAddRoleOpen] = useState(false);
-  const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [viewRole, setViewRole] = useState<Role | null>(null);
+  const [addDialogRoleId, setAddDialogRoleId] = useState<number | null>(null);
   const [deletingRoleId, setDeletingRoleId] = useState<number | null>(null);
   const [deletingQuestionId, setDeletingQuestionId] = useState<number | null>(
+    null
+  );
+  const [creatingVoiceAgent, setCreatingVoiceAgent] = useState<number | null>(
     null
   );
 
@@ -91,10 +96,14 @@ const RoleManagement = () => {
 
   const [questionForm, setQuestionForm] = useState({
     question_text: "",
-    question_type: "text" as const,
+    question_type: "text" as
+      | "text"
+      | "multiple_choice"
+      | "coding"
+      | "behavioral",
     options: [""],
     correct_answer: "",
-    difficulty: "medium" as const,
+    difficulty: "medium" as "easy" | "medium" | "hard",
   });
 
   const departments = [
@@ -124,12 +133,18 @@ const RoleManagement = () => {
   ];
 
   useEffect(() => {
-    fetchRoles();
+    console.log("RoleManagement useEffect triggered, token:", !!token);
+    if (token) {
+      fetchRoles();
+    } else {
+      setLoading(false);
+    }
   }, [token]);
 
   const fetchRoles = async () => {
     if (!token) return;
 
+    console.log("Fetching roles...");
     try {
       const response = await fetch("/api/company/roles", {
         headers: {
@@ -137,17 +152,32 @@ const RoleManagement = () => {
         },
       });
 
+      console.log("Response status:", response.status);
       if (!response.ok) {
-        throw new Error("Failed to fetch roles");
+        throw new Error(`Failed to fetch roles: ${response.status}`);
       }
 
       const rolesData = await response.json();
-      setRoles(rolesData);
+      console.log("Roles data received:", rolesData);
+      const normalized = Array.isArray(rolesData)
+        ? rolesData.map((r: any) => ({
+            ...r,
+            id: (r as any).id,
+            created_at: (r as any).created_at,
+            vapi_workflow_id: (r as any).vapi_workflow_id,
+            questions: Array.isArray((r as any).questions)
+              ? (r as any).questions
+              : [],
+          }))
+        : [];
+      setRoles(normalized);
     } catch (error) {
       console.error("Error fetching roles:", error);
+      // Set empty roles array instead of leaving it undefined
+      setRoles([]);
       toast({
         title: "Error",
-        description: "Failed to load roles",
+        description: "Failed to load roles. Please check your connection.",
         variant: "destructive",
       });
     } finally {
@@ -173,7 +203,13 @@ const RoleManagement = () => {
       }
 
       const newRole = await response.json();
-      setRoles((prev) => [...prev, newRole]);
+      setRoles((prev) => [
+        ...prev,
+        {
+          ...newRole,
+          questions: Array.isArray(newRole.questions) ? newRole.questions : [],
+        },
+      ]);
       setIsAddRoleOpen(false);
       resetRoleForm();
       toast({
@@ -192,6 +228,14 @@ const RoleManagement = () => {
 
   const handleUpdateRole = async () => {
     if (!token || !editingRole) return;
+    if (!editingRole.id) {
+      toast({
+        title: "Unavailable",
+        description: "Cannot update this role because it has no identifier.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       const response = await fetch(`/api/company/roles/${editingRole.id}`, {
@@ -231,6 +275,14 @@ const RoleManagement = () => {
 
   const handleDeleteRole = async (roleId: number) => {
     if (!token) return;
+    if (!roleId) {
+      toast({
+        title: "Unavailable",
+        description: "Cannot delete this role because it has no identifier.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setDeletingRoleId(roleId);
 
@@ -243,7 +295,13 @@ const RoleManagement = () => {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to delete role");
+        const errorText = await response.text();
+        console.error("Delete role failed:", response.status, errorText);
+        throw new Error(
+          `Failed to delete role (${response.status}): ${
+            errorText || response.statusText
+          }`
+        );
       }
 
       setRoles((prev) => prev.filter((role) => role.id !== roleId));
@@ -255,7 +313,8 @@ const RoleManagement = () => {
       console.error("Error deleting role:", error);
       toast({
         title: "Error",
-        description: "Failed to delete role",
+        description:
+          error instanceof Error ? error.message : "Failed to delete role",
         variant: "destructive",
       });
     } finally {
@@ -263,17 +322,21 @@ const RoleManagement = () => {
     }
   };
 
-  const handleAddQuestion = async () => {
-    if (!token || !selectedRole) return;
+  const handleAddQuestion = async (targetRole: Role) => {
+    if (!token || !targetRole || !targetRole.id) {
+      toast({
+        title: "Unavailable",
+        description:
+          "Cannot add a question to this role because it has no identifier.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       const questionData = {
         ...questionForm,
-        role_id: selectedRole.id,
-        options:
-          questionForm.question_type === "multiple_choice"
-            ? questionForm.options
-            : undefined,
+        role_id: targetRole.id,
       };
 
       const response = await fetch("/api/company/questions", {
@@ -292,12 +355,13 @@ const RoleManagement = () => {
       const newQuestion = await response.json();
       setRoles((prev) =>
         prev.map((role) =>
-          role.id === selectedRole.id
+          role.id === targetRole.id
             ? { ...role, questions: [...role.questions, newQuestion] }
             : role
         )
       );
-      setIsAddQuestionOpen(false);
+      // Close the add question dialog after success
+      setAddDialogRoleId(null);
       resetQuestionForm();
       toast({
         title: "Success",
@@ -405,6 +469,58 @@ const RoleManagement = () => {
     }
   };
 
+  const handleCreateVoiceAgent = async (roleId: number) => {
+    if (!token) return;
+
+    setCreatingVoiceAgent(roleId);
+
+    try {
+      const response = await fetch(
+        `/api/company/roles/${roleId}/create-workflow`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to create voice agent");
+      }
+
+      const result = await response.json();
+
+      // Update the role with the new vapi_workflow_id
+      setRoles((prev) =>
+        prev.map((role) =>
+          role.id === roleId
+            ? {
+                ...role,
+                vapi_workflow_id: result.vapi_workflow_id || result.workflow_id,
+              }
+            : role
+        )
+      );
+
+      toast({
+        title: "Success",
+        description:
+          "AI Voice Agent created successfully! Questions can no longer be modified.",
+      });
+    } catch (error) {
+      console.error("Error creating voice agent:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create voice agent",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingVoiceAgent(null);
+    }
+  };
+
   const resetRoleForm = () => {
     setRoleForm({
       title: "",
@@ -417,10 +533,14 @@ const RoleManagement = () => {
   const resetQuestionForm = () => {
     setQuestionForm({
       question_text: "",
-      question_type: "text",
+      question_type: "text" as
+        | "text"
+        | "multiple_choice"
+        | "coding"
+        | "behavioral",
       options: [""],
       correct_answer: "",
-      difficulty: "medium",
+      difficulty: "medium" as "easy" | "medium" | "hard",
     });
   };
 
@@ -438,32 +558,15 @@ const RoleManagement = () => {
     setEditingQuestion(question);
     setQuestionForm({
       question_text: question.question_text,
-      question_type: question.question_type,
-      options: question.options || [""],
-      correct_answer: question.correct_answer || "",
+      question_type: (["text", "coding", "behavioral"] as const).includes(
+        question.question_type as any
+      )
+        ? (question.question_type as "text" | "coding" | "behavioral")
+        : "text",
+      options: [""],
+      correct_answer: "",
       difficulty: question.difficulty,
     });
-  };
-
-  const addOption = () => {
-    setQuestionForm((prev) => ({
-      ...prev,
-      options: [...prev.options, ""],
-    }));
-  };
-
-  const removeOption = (index: number) => {
-    setQuestionForm((prev) => ({
-      ...prev,
-      options: prev.options.filter((_, i) => i !== index),
-    }));
-  };
-
-  const updateOption = (index: number, value: string) => {
-    setQuestionForm((prev) => ({
-      ...prev,
-      options: prev.options.map((opt, i) => (i === index ? value : opt)),
-    }));
   };
 
   const getQuestionTypeLabel = (type: string) => {
@@ -499,6 +602,34 @@ const RoleManagement = () => {
     );
   }
 
+  // Safety check - ensure roles is always an array
+  console.log(
+    "Render check - loading:",
+    loading,
+    "roles:",
+    roles,
+    "roles type:",
+    typeof roles
+  );
+  if (!Array.isArray(roles)) {
+    console.log("Roles is not an array, setting to empty array");
+    setRoles([]);
+    return (
+      <div className='min-h-screen bg-background'>
+        <Navigation variant='company' />
+        <div className='max-w-7xl mx-auto px-6 py-8'>
+          <div className='flex items-center justify-center min-h-[60vh]'>
+            <div className='text-center'>
+              <p className='text-lg text-muted-foreground'>
+                Something went wrong. Please refresh the page.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className='min-h-screen bg-background'>
       <Navigation variant='company' />
@@ -517,7 +648,7 @@ const RoleManagement = () => {
 
           <Dialog open={isAddRoleOpen} onOpenChange={setIsAddRoleOpen}>
             <DialogTrigger asChild>
-              <Button className='btn-hero flex items-center gap-2'>
+              <Button className='bg-primary hover:bg-primary/90 text-primary-foreground flex items-center gap-2'>
                 <Plus className='h-4 w-4' />
                 Add New Role
               </Button>
@@ -550,7 +681,10 @@ const RoleManagement = () => {
                     <Select
                       value={roleForm.department}
                       onValueChange={(value) =>
-                        setRoleForm((prev) => ({ ...prev, department: value }))
+                        setRoleForm((prev) => ({
+                          ...prev,
+                          department: value,
+                        }))
                       }>
                       <SelectTrigger>
                         <SelectValue placeholder='Select department' />
@@ -609,245 +743,292 @@ const RoleManagement = () => {
         </div>
 
         {/* Roles Grid */}
-        <div className='grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8'>
-          {roles.map((role) => (
-            <Card key={role.id} className='p-6'>
-              <div className='flex items-start justify-between mb-4'>
-                <div className='flex-1'>
-                  <div className='flex items-center gap-2 mb-2'>
-                    <Briefcase className='h-5 w-5 text-primary' />
-                    <h3 className='text-lg font-semibold'>{role.title}</h3>
-                    <Badge variant='secondary'>{role.department}</Badge>
-                  </div>
-                  <p className='text-muted-foreground text-sm mb-3'>
-                    {role.description}
-                  </p>
-                  <div className='space-y-2'>
-                    <div className='flex items-center gap-2'>
-                      <FileText className='h-4 w-4 text-muted-foreground' />
-                      <span className='text-sm text-muted-foreground'>
-                        {role.questions.length} question
-                        {role.questions.length !== 1 ? "s" : ""}
-                      </span>
+        {roles.length === 0 ? (
+          <div className='text-center py-12'>
+            <Briefcase className='h-16 w-16 text-muted-foreground mx-auto mb-4' />
+            <h3 className='text-lg font-medium mb-2'>No roles yet</h3>
+            <p className='text-muted-foreground mb-4'>
+              Get started by creating your first job role
+            </p>
+            <Button
+              onClick={() => setIsAddRoleOpen(true)}
+              className='bg-primary hover:bg-primary/90 text-primary-foreground'>
+              <Plus className='h-4 w-4 mr-2' />
+              Create Your First Role
+            </Button>
+          </div>
+        ) : (
+          <div className='grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8'>
+            {roles.map((role, index) => (
+              <Card
+                key={role.id ?? `role-${index}-${role.title}`}
+                className='p-6'>
+                <div className='flex items-start justify-between mb-4'>
+                  <div className='flex-1'>
+                    <div className='flex items-center gap-2 mb-2'>
+                      <Briefcase className='h-5 w-5 text-primary' />
+                      <h3 className='text-lg font-semibold'>{role.title}</h3>
+                      <Badge variant='secondary'>{role.department}</Badge>
                     </div>
-                    <div className='text-sm'>
-                      <strong>Requirements:</strong> {role.requirements}
-                    </div>
-                  </div>
-                </div>
-                <div className='flex gap-2'>
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    onClick={() => openEditRole(role)}>
-                    <Edit className='h-4 w-4' />
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant='ghost'
-                        size='sm'
-                        className='text-destructive hover:text-destructive'
-                        disabled={deletingRoleId === role.id}>
-                        <Trash2 className='h-4 w-4' />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Role</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to delete the role "{role.title}
-                          "? This will also delete all associated questions.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDeleteRole(role.id)}
-                          className='bg-destructive text-destructive-foreground hover:bg-destructive/90'>
-                          Delete Role
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </div>
-
-              <Separator className='my-4' />
-
-              <div className='flex items-center justify-between'>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={() => setSelectedRole(role)}
-                  className='flex items-center gap-2'>
-                  <Users className='h-4 w-4' />
-                  View Questions
-                </Button>
-
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button
-                      size='sm'
-                      onClick={() => setSelectedRole(role)}
-                      className='flex items-center gap-2'>
-                      <PlusCircle className='h-4 w-4' />
-                      Add Question
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className='sm:max-w-[600px]'>
-                    <DialogHeader>
-                      <DialogTitle>Add Question to {role.title}</DialogTitle>
-                      <DialogDescription>
-                        Create a new interview question for this role.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className='grid gap-4 py-4'>
-                      <div className='space-y-2'>
-                        <Label htmlFor='question-text'>Question</Label>
-                        <Textarea
-                          id='question-text'
-                          value={questionForm.question_text}
-                          onChange={(e) =>
-                            setQuestionForm((prev) => ({
-                              ...prev,
-                              question_text: e.target.value,
-                            }))
-                          }
-                          placeholder='Enter your question...'
-                          rows={3}
-                        />
+                    <p className='text-muted-foreground text-sm mb-3'>
+                      {role.description}
+                    </p>
+                    <div className='space-y-2'>
+                      <div className='flex items-center gap-2'>
+                        <FileText className='h-4 w-4 text-muted-foreground' />
+                        <span className='text-sm text-muted-foreground'>
+                          {role.questions?.length ?? 0} question
+                          {(role.questions?.length ?? 0) !== 1 ? "s" : ""}
+                        </span>
                       </div>
-                      <div className='grid grid-cols-2 gap-4'>
-                        <div className='space-y-2'>
-                          <Label htmlFor='question-type'>Question Type</Label>
-                          <Select
-                            value={questionForm.question_type}
-                            onValueChange={(value: any) =>
-                              setQuestionForm((prev) => ({
-                                ...prev,
-                                question_type: value,
-                              }))
-                            }>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {questionTypes.map((type) => (
-                                <SelectItem key={type.value} value={type.value}>
-                                  {type.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className='space-y-2'>
-                          <Label htmlFor='difficulty'>Difficulty</Label>
-                          <Select
-                            value={questionForm.difficulty}
-                            onValueChange={(value: any) =>
-                              setQuestionForm((prev) => ({
-                                ...prev,
-                                difficulty: value,
-                              }))
-                            }>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {difficulties.map((diff) => (
-                                <SelectItem key={diff.value} value={diff.value}>
-                                  {diff.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      <div className='text-sm'>
+                        <strong>Requirements:</strong> {role.requirements}
                       </div>
-
-                      {questionForm.question_type === "multiple_choice" && (
-                        <div className='space-y-2'>
-                          <Label>Options</Label>
-                          <div className='space-y-2'>
-                            {questionForm.options.map((option, index) => (
-                              <div key={index} className='flex gap-2'>
-                                <Input
-                                  value={option}
-                                  onChange={(e) =>
-                                    updateOption(index, e.target.value)
-                                  }
-                                  placeholder={`Option ${index + 1}`}
-                                />
-                                <Button
-                                  type='button'
-                                  variant='outline'
-                                  size='sm'
-                                  onClick={() => removeOption(index)}
-                                  disabled={questionForm.options.length === 1}>
-                                  <X className='h-4 w-4' />
-                                </Button>
-                              </div>
-                            ))}
-                            <Button
-                              type='button'
-                              variant='outline'
-                              size='sm'
-                              onClick={addOption}
-                              className='w-full'>
-                              <Plus className='h-4 w-4 mr-2' />
-                              Add Option
-                            </Button>
+                      <div className='flex items-center gap-2'>
+                        {role.vapi_workflow_id ? (
+                          <div className='flex items-center gap-2'>
+                            <Mic className='h-4 w-4 text-green-600' />
+                            <span className='text-sm text-green-600 font-medium'>
+                              AI Voice Agent Active
+                            </span>
                           </div>
+                        ) : (
+                          <div className='flex items-center gap-2'>
+                            <MicOff className='h-4 w-4 text-muted-foreground' />
+                            <span className='text-sm text-muted-foreground'>
+                              No Voice Agent
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className='flex gap-2'>
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => openEditRole(role)}>
+                      <Edit className='h-4 w-4' />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant='ghost'
+                          size='sm'
+                          className='text-destructive hover:text-destructive'
+                          disabled={deletingRoleId === role.id}>
+                          <Trash2 className='h-4 w-4' />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Role</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete the role "
+                            {role.title}
+                            "? This will also delete all associated questions.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteRole(role.id)}
+                            className='bg-destructive text-destructive-foreground hover:bg-destructive/90'>
+                            Delete Role
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+
+                <Separator className='my-4' />
+
+                <div className='flex items-center justify-between'>
+                  <div className='flex gap-2'>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => setViewRole(role)}
+                      className='flex items-center gap-2'>
+                      <Users className='h-4 w-4' />
+                      View Questions
+                    </Button>
+
+                    {!role.vapi_workflow_id && (
+                      <Button
+                        size='sm'
+                        onClick={() =>
+                          role.id && handleCreateVoiceAgent(role.id)
+                        }
+                        disabled={creatingVoiceAgent === role.id}
+                        className='flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white'>
+                        {creatingVoiceAgent === role.id ? (
+                          <Loader2 className='h-4 w-4 animate-spin' />
+                        ) : (
+                          <Mic className='h-4 w-4' />
+                        )}
+                        {creatingVoiceAgent === role.id
+                          ? "Creating..."
+                          : "Create Voice Agent"}
+                      </Button>
+                    )}
+                  </div>
+
+                  <Dialog
+                    open={addDialogRoleId === role.id}
+                    onOpenChange={(open) =>
+                      setAddDialogRoleId(open ? role.id ?? null : null)
+                    }>
+                    <DialogTrigger asChild>
+                      <Button
+                        size='sm'
+                        onClick={() => setAddDialogRoleId(role.id ?? null)}
+                        disabled={!!role.vapi_workflow_id}
+                        className='flex items-center gap-2'>
+                        <PlusCircle className='h-4 w-4' />
+                        Add Question
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className='sm:max-w-[600px]'>
+                      <DialogHeader>
+                        <DialogTitle>Add Question to {role.title}</DialogTitle>
+                        <DialogDescription>
+                          Create a new interview question for this role.
+                        </DialogDescription>
+                      </DialogHeader>
+                      {role.vapi_workflow_id && (
+                        <div className='bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4'>
+                          <div className='flex items-center gap-2'>
+                            <Mic className='h-4 w-4 text-yellow-600' />
+                            <span className='text-sm font-medium text-yellow-800'>
+                              Voice Agent Active
+                            </span>
+                          </div>
+                          <p className='text-sm text-yellow-700 mt-1'>
+                            This role has an active AI voice agent. Questions
+                            cannot be modified once a voice agent is created.
+                          </p>
                         </div>
                       )}
-
-                      {questionForm.question_type === "multiple_choice" && (
+                      <div className='grid gap-4 py-4'>
                         <div className='space-y-2'>
-                          <Label htmlFor='correct-answer'>Correct Answer</Label>
-                          <Input
-                            id='correct-answer'
-                            value={questionForm.correct_answer}
+                          <Label htmlFor='question-text'>Question</Label>
+                          <Textarea
+                            id='question-text'
+                            value={questionForm.question_text}
                             onChange={(e) =>
                               setQuestionForm((prev) => ({
                                 ...prev,
-                                correct_answer: e.target.value,
+                                question_text: e.target.value,
                               }))
                             }
-                            placeholder='Enter the correct answer'
+                            placeholder='Enter your question...'
+                            rows={3}
                           />
                         </div>
-                      )}
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        variant='outline'
-                        onClick={() => setIsAddQuestionOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button onClick={handleAddQuestion}>Add Question</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </Card>
-          ))}
-        </div>
+                        <div className='grid grid-cols-2 gap-4'>
+                          <div className='space-y-2'>
+                            <Label htmlFor='question-type'>Question Type</Label>
+                            <Select
+                              value={questionForm.question_type}
+                              onValueChange={(
+                                value:
+                                  | "text"
+                                  | "multiple_choice"
+                                  | "coding"
+                                  | "behavioral"
+                              ) =>
+                                setQuestionForm((prev) => ({
+                                  ...prev,
+                                  question_type: value,
+                                }))
+                              }>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {questionTypes.map((type) => (
+                                  <SelectItem
+                                    key={type.value}
+                                    value={type.value}>
+                                    {type.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className='space-y-2'>
+                            <Label htmlFor='difficulty'>Difficulty</Label>
+                            <Select
+                              value={questionForm.difficulty}
+                              onValueChange={(value: any) =>
+                                setQuestionForm((prev) => ({
+                                  ...prev,
+                                  difficulty: value,
+                                }))
+                              }>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {difficulties.map((diff) => (
+                                  <SelectItem
+                                    key={diff.value}
+                                    value={diff.value}>
+                                    {diff.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button variant='outline'>Cancel</Button>
+                        </DialogClose>
+                        <Button
+                          onClick={() => handleAddQuestion(role)}
+                          disabled={!!role.vapi_workflow_id}>
+                          Add Question
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {/* Questions Modal */}
-        {selectedRole && (
-          <Dialog
-            open={!!selectedRole}
-            onOpenChange={() => setSelectedRole(null)}>
+        {viewRole && (
+          <Dialog open={!!viewRole} onOpenChange={() => setViewRole(null)}>
             <DialogContent className='sm:max-w-[800px] max-h-[80vh] overflow-y-auto'>
               <DialogHeader>
-                <DialogTitle>Questions for {selectedRole.title}</DialogTitle>
+                <DialogTitle>Questions for {viewRole.title}</DialogTitle>
                 <DialogDescription>
                   Manage interview questions for this role.
                 </DialogDescription>
               </DialogHeader>
+              {viewRole.vapi_workflow_id && (
+                <div className='bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4'>
+                  <div className='flex items-center gap-2'>
+                    <Mic className='h-4 w-4 text-yellow-600' />
+                    <span className='text-sm font-medium text-yellow-800'>
+                      Voice Agent Active
+                    </span>
+                  </div>
+                  <p className='text-sm text-yellow-700 mt-1'>
+                    This role has an active AI voice agent. Questions cannot be
+                    modified or deleted once a voice agent is created.
+                  </p>
+                </div>
+              )}
 
               <div className='space-y-4'>
-                {selectedRole.questions.length === 0 ? (
+                {(viewRole.questions?.length ?? 0) === 0 ? (
                   <div className='text-center py-8'>
                     <FileText className='h-12 w-12 text-muted-foreground mx-auto mb-4' />
                     <p className='text-muted-foreground'>
@@ -858,7 +1039,7 @@ const RoleManagement = () => {
                     </p>
                   </div>
                 ) : (
-                  selectedRole.questions.map((question) => (
+                  (viewRole.questions ?? []).map((question) => (
                     <Card key={question.id} className='p-4'>
                       <div className='flex items-start justify-between'>
                         <div className='flex-1'>
@@ -876,37 +1057,14 @@ const RoleManagement = () => {
                           <p className='font-medium mb-2'>
                             {question.question_text}
                           </p>
-
-                          {question.question_type === "multiple_choice" &&
-                            question.options && (
-                              <div className='space-y-1'>
-                                <p className='text-sm text-muted-foreground'>
-                                  Options:
-                                </p>
-                                <div className='grid grid-cols-2 gap-2'>
-                                  {question.options.map((option, index) => (
-                                    <div
-                                      key={index}
-                                      className='text-sm p-2 bg-muted rounded'>
-                                      {option}
-                                    </div>
-                                  ))}
-                                </div>
-                                {question.correct_answer && (
-                                  <p className='text-sm text-green-600 mt-2'>
-                                    <strong>Correct Answer:</strong>{" "}
-                                    {question.correct_answer}
-                                  </p>
-                                )}
-                              </div>
-                            )}
                         </div>
 
                         <div className='flex gap-2 ml-4'>
                           <Button
                             variant='ghost'
                             size='sm'
-                            onClick={() => openEditQuestion(question)}>
+                            onClick={() => openEditQuestion(question)}
+                            disabled={!!viewRole.vapi_workflow_id}>
                             <Edit className='h-4 w-4' />
                           </Button>
                           <AlertDialog>
@@ -915,7 +1073,10 @@ const RoleManagement = () => {
                                 variant='ghost'
                                 size='sm'
                                 className='text-destructive hover:text-destructive'
-                                disabled={deletingQuestionId === question.id}>
+                                disabled={
+                                  deletingQuestionId === question.id ||
+                                  !!viewRole.vapi_workflow_id
+                                }>
                                 <Trash2 className='h-4 w-4' />
                               </Button>
                             </AlertDialogTrigger>
@@ -984,7 +1145,10 @@ const RoleManagement = () => {
                     <Select
                       value={roleForm.department}
                       onValueChange={(value) =>
-                        setRoleForm((prev) => ({ ...prev, department: value }))
+                        setRoleForm((prev) => ({
+                          ...prev,
+                          department: value,
+                        }))
                       }>
                       <SelectTrigger>
                         <SelectValue placeholder='Select department' />
@@ -1052,129 +1216,120 @@ const RoleManagement = () => {
                   Update the question information.
                 </DialogDescription>
               </DialogHeader>
-              <div className='grid gap-4 py-4'>
-                <div className='space-y-2'>
-                  <Label htmlFor='edit-question-text'>Question</Label>
-                  <Textarea
-                    id='edit-question-text'
-                    value={questionForm.question_text}
-                    onChange={(e) =>
-                      setQuestionForm((prev) => ({
-                        ...prev,
-                        question_text: e.target.value,
-                      }))
-                    }
-                    placeholder='Enter your question...'
-                    rows={3}
-                  />
-                </div>
-                <div className='grid grid-cols-2 gap-4'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='edit-question-type'>Question Type</Label>
-                    <Select
-                      value={questionForm.question_type}
-                      onValueChange={(value: any) =>
-                        setQuestionForm((prev) => ({
-                          ...prev,
-                          question_type: value,
-                        }))
-                      }>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {questionTypes.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className='space-y-2'>
-                    <Label htmlFor='edit-difficulty'>Difficulty</Label>
-                    <Select
-                      value={questionForm.difficulty}
-                      onValueChange={(value: any) =>
-                        setQuestionForm((prev) => ({
-                          ...prev,
-                          difficulty: value,
-                        }))
-                      }>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {difficulties.map((diff) => (
-                          <SelectItem key={diff.value} value={diff.value}>
-                            {diff.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+              {(() => {
+                const roleWithQuestion = roles.find((role) =>
+                  role.questions?.some((q) => q.id === editingQuestion.id)
+                );
+                return (
+                  roleWithQuestion?.vapi_workflow_id && (
+                    <div className='bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4'>
+                      <div className='flex items-center gap-2'>
+                        <Mic className='h-4 w-4 text-yellow-600' />
+                        <span className='text-sm font-medium text-yellow-800'>
+                          Voice Agent Active
+                        </span>
+                      </div>
+                      <p className='text-sm text-yellow-700 mt-1'>
+                        This role has an active AI voice agent. Questions cannot
+                        be modified once a voice agent is created.
+                      </p>
+                    </div>
+                  )
+                );
+              })()}
+              {(() => {
+                const roleWithQuestion = roles.find((role) =>
+                  role.questions?.some((q) => q.id === editingQuestion.id)
+                );
+                const isVoiceAgentActive = !!roleWithQuestion?.vapi_workflow_id;
 
-                {questionForm.question_type === "multiple_choice" && (
-                  <div className='space-y-2'>
-                    <Label>Options</Label>
+                return (
+                  <div className='grid gap-4 py-4'>
                     <div className='space-y-2'>
-                      {questionForm.options.map((option, index) => (
-                        <div key={index} className='flex gap-2'>
-                          <Input
-                            value={option}
-                            onChange={(e) =>
-                              updateOption(index, e.target.value)
-                            }
-                            placeholder={`Option ${index + 1}`}
-                          />
-                          <Button
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            onClick={() => removeOption(index)}
-                            disabled={questionForm.options.length === 1}>
-                            <X className='h-4 w-4' />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        type='button'
-                        variant='outline'
-                        size='sm'
-                        onClick={addOption}
-                        className='w-full'>
-                        <Plus className='h-4 w-4 mr-2' />
-                        Add Option
-                      </Button>
+                      <Label htmlFor='edit-question-text'>Question</Label>
+                      <Textarea
+                        id='edit-question-text'
+                        value={questionForm.question_text}
+                        onChange={(e) =>
+                          setQuestionForm((prev) => ({
+                            ...prev,
+                            question_text: e.target.value,
+                          }))
+                        }
+                        placeholder='Enter your question...'
+                        rows={3}
+                        disabled={isVoiceAgentActive}
+                      />
+                    </div>
+                    <div className='grid grid-cols-2 gap-4'>
+                      <div className='space-y-2'>
+                        <Label htmlFor='edit-question-type'>
+                          Question Type
+                        </Label>
+                        <Select
+                          value={questionForm.question_type}
+                          onValueChange={(value: any) =>
+                            setQuestionForm((prev) => ({
+                              ...prev,
+                              question_type: value,
+                            }))
+                          }
+                          disabled={isVoiceAgentActive}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {questionTypes.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className='space-y-2'>
+                        <Label htmlFor='edit-difficulty'>Difficulty</Label>
+                        <Select
+                          value={questionForm.difficulty}
+                          onValueChange={(value: any) =>
+                            setQuestionForm((prev) => ({
+                              ...prev,
+                              difficulty: value,
+                            }))
+                          }
+                          disabled={isVoiceAgentActive}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {difficulties.map((diff) => (
+                              <SelectItem key={diff.value} value={diff.value}>
+                                {diff.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
-                )}
-
-                {questionForm.question_type === "multiple_choice" && (
-                  <div className='space-y-2'>
-                    <Label htmlFor='edit-correct-answer'>Correct Answer</Label>
-                    <Input
-                      id='edit-correct-answer'
-                      value={questionForm.correct_answer}
-                      onChange={(e) =>
-                        setQuestionForm((prev) => ({
-                          ...prev,
-                          correct_answer: e.target.value,
-                        }))
-                      }
-                      placeholder='Enter the correct answer'
-                    />
-                  </div>
-                )}
-              </div>
+                );
+              })()}
               <DialogFooter>
                 <Button
                   variant='outline'
                   onClick={() => setEditingQuestion(null)}>
                   Cancel
                 </Button>
-                <Button onClick={handleUpdateQuestion}>Update Question</Button>
+                <Button
+                  onClick={handleUpdateQuestion}
+                  disabled={(() => {
+                    const roleWithQuestion = roles.find((role) =>
+                      role.questions?.some((q) => q.id === editingQuestion.id)
+                    );
+                    return !!roleWithQuestion?.vapi_workflow_id;
+                  })()}>
+                  Update Question
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
