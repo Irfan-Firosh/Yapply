@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import os
 import dotenv
 from db_functions.access_table import get_supabase_client
+from helper.candidate.create_call import make_call, retrive_transcript
 dotenv.load_dotenv()
 
 router = APIRouter(prefix="/candidate", tags=["candidate"])
@@ -20,6 +21,7 @@ class Candidate(BaseModel):
 
 class CandidateInDB(Candidate):
     company_id: str
+    vapi_workflow_id: str | None = None
 
 
 def verify_candidate(email: str):
@@ -89,7 +91,16 @@ async def get_company_name(current_candidate: Annotated[Candidate, Depends(get_c
     company = supabase.table("company").select("*").eq("company_id", company_uid).execute().data[0]
     return company["username"]
 
+@router.get("/call", summary="Get phone call", response_model=str)
+async def get_phone_call(current_candidate: Annotated[Candidate, Depends(get_current_candidate)]):
+    return "phone call"
 
+@router.get("/createcall", summary="Create phone call", response_model=str)
+async def get_vapi_workflow_id(current_candidate: Annotated[Candidate, Depends(get_current_candidate)]):
+    workflow_id = current_candidate.vapi_workflow_id
+    call_id = make_call(workflow_id, current_candidate.candidate_phone, current_candidate.candidate_name)
+    supabase.table("interviews").update({"call_id": call_id, "status": "Completed"}).eq("candidate_email", current_candidate.candidate_email).execute()
+    return call_id
 
 
 
