@@ -17,6 +17,7 @@ import MagicLinkSender from "./pages/MagicLinkSender";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 import RoleManagement from "./pages/RoleManagement";
+import AuthHashRouter from "@/components/AuthHashRouter";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <AuthHashRouter />
             <Routes>
               <Route path='/' element={<LandingPage />} />
               <Route path='/company/login' element={<CompanyLogin />} />

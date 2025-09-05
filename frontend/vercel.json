@@ -3,6 +3,10 @@
     {
       "source": "/api/(.*)",
       "destination": "http://3.19.208.130/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/"
     }
   ],
   "headers": [

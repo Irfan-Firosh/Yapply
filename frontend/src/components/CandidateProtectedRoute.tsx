@@ -18,6 +18,9 @@ const CandidateProtectedRoute = ({ children }: CandidateProtectedRouteProps) => 
     const checkAuth = async () => {
       if (loading) return; // Wait for auth context to load
       
+      // Add a small delay to allow AuthCallback to complete if coming from magic link
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       // Just check if we have any session - don't redirect to auth/callback
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -31,6 +34,7 @@ const CandidateProtectedRoute = ({ children }: CandidateProtectedRouteProps) => 
       }
 
       // No session at all, redirect to landing page
+      console.log('CandidateProtectedRoute: No session found, redirecting to /');
       toast({
         title: "Authentication Required",
         description: "Please use the magic link sent to your email to access your dashboard.",
