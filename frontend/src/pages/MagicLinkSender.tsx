@@ -504,6 +504,15 @@ const MagicLinkSender = () => {
                       candidate.
                     </p>
                   </div>
+                ) : interview.status.toLowerCase() === "completed" ? (
+                  <div className='p-4 bg-blue-50 border border-blue-200 rounded-lg'>
+                    <p className='text-blue-800 font-medium'>
+                      Interview Completed
+                    </p>
+                    <p className='text-sm text-blue-600'>
+                      Cannot send magic link: This interview has already been completed.
+                    </p>
+                  </div>
                 ) : (
                   <>
                     <Button
