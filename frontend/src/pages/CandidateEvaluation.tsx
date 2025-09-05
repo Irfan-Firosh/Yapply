@@ -29,6 +29,17 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
 } from "recharts";
 
 interface EvaluationData {
@@ -444,72 +455,80 @@ const CandidateEvaluation = () => {
           </Button>
         </div>
 
-        {/* Overall Comment */}
-        <Card className='mb-8'>
-          <CardHeader>
-            <CardTitle className='text-lg'>Overall Comment</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className='text-muted-foreground leading-relaxed'>
-              {evaluationData?.evaluation.overall_comment}
-            </p>
-          </CardContent>
-        </Card>
+        {/* Top Row - Overall Assessment & Key Metrics */}
+        <div className='grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8'>
+          {/* Overall Score Card */}
+          <Card className='lg:col-span-1'>
+            <CardHeader className='text-center'>
+              <CardTitle className='text-lg'>Overall Score</CardTitle>
+            </CardHeader>
+            <CardContent className='text-center space-y-4'>
+              <div className='text-4xl font-bold text-primary'>
+                {evaluationData?.evaluation.overall_score}/100
+              </div>
+              <div className='flex items-center justify-center gap-2'>
+                {getRecommendationIcon(
+                  evaluationData?.evaluation.recommendation || ""
+                )}
+                <span
+                  className={`font-semibold ${getHireStatusColor(
+                    evaluationData?.evaluation.overall_score || 0
+                  )}`}>
+                  {getHireStatus(evaluationData?.evaluation.overall_score || 0)}
+                </span>
+              </div>
+              <Badge
+                className={getRecommendationColor(
+                  evaluationData?.evaluation.recommendation || ""
+                )}>
+                {evaluationData?.evaluation.recommendation}
+              </Badge>
+            </CardContent>
+          </Card>
 
-        <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
-          {/* Performance Radar with Overall Score */}
+          {/* Key Strengths */}
+          <Card className='lg:col-span-2'>
+            <CardHeader>
+              <CardTitle className='text-lg'>Key Strengths</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className='text-muted-foreground leading-relaxed'>
+                {evaluationData?.evaluation.key_strengths}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Second Row - Charts */}
+        <div className='grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8'>
+          {/* Performance Radar Chart */}
           <Card>
             <CardHeader>
-              <div className='flex items-center justify-between'>
-                <CardTitle className='text-lg'>Performance Radar</CardTitle>
-                <div className='text-right'>
-                  <div className='text-2xl font-bold text-primary'>
-                    {evaluationData?.evaluation.overall_score}/100
-                  </div>
-                  <div className='flex items-center justify-end gap-2 mt-1'>
-                    {getRecommendationIcon(
-                      evaluationData?.evaluation.recommendation || ""
-                    )}
-                    <span
-                      className={`text-sm font-semibold ${getHireStatusColor(
-                        evaluationData?.evaluation.overall_score || 0
-                      )}`}>
-                      {getHireStatus(
-                        evaluationData?.evaluation.overall_score || 0
-                      )}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <CardTitle className='text-lg'>Performance Radar</CardTitle>
             </CardHeader>
             <CardContent>
               <div className='h-80'>
                 <ResponsiveContainer width='100%' height='100%'>
                   <RadarChart
                     data={radarData}
-                    margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                    <PolarGrid stroke='#e5e7eb' />
+                    margin={{ top: 40, right: 40, bottom: 40, left: 40 }}>
+                    <PolarGrid stroke='#e5e7eb' strokeWidth={1} />
                     <PolarAngleAxis
                       dataKey='subject'
                       tick={{
-                        fill: "#6b7280",
-                        fontSize: 10,
+                        fill: "#374151",
+                        fontSize: 12,
+                        fontWeight: 500,
                         textAnchor: "middle",
                         dominantBaseline: "middle",
-                      }}
-                      tickFormatter={(value) => {
-                        // Truncate long labels to prevent overflow
-                        if (value.length > 8) {
-                          return value.substring(0, 8) + "...";
-                        }
-                        return value;
                       }}
                     />
                     <PolarRadiusAxis
                       angle={90}
                       domain={[0, 100]}
-                      tick={{ fill: "#6b7280", fontSize: 8 }}
+                      tick={{ fill: "#6b7280", fontSize: 10 }}
                       tickCount={5}
+                      tickFormatter={(value) => `${value}`}
                     />
                     <Radar
                       name='Score'
@@ -518,6 +537,21 @@ const CandidateEvaluation = () => {
                       fill='#000000'
                       fillOpacity={0.1}
                       strokeWidth={2}
+                      dot={{ fill: "#000000", strokeWidth: 2, r: 3 }}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => [`${value}/100`, "Score"]}
+                      labelStyle={{
+                        color: "#374151",
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}
+                      contentStyle={{
+                        backgroundColor: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                      }}
                     />
                   </RadarChart>
                 </ResponsiveContainer>
@@ -525,14 +559,91 @@ const CandidateEvaluation = () => {
             </CardContent>
           </Card>
 
-          {/* Key Strengths - Compact */}
+          {/* Bar Chart for Detailed Scores */}
           <Card>
             <CardHeader>
-              <CardTitle className='text-lg'>Key Strengths</CardTitle>
+              <CardTitle className='text-lg'>Detailed Scores</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className='text-sm text-muted-foreground leading-relaxed'>
-                {evaluationData?.evaluation.key_strengths}
+              <div className='h-80'>
+                <ResponsiveContainer width='100%' height='100%'>
+                  <BarChart
+                    data={radarData}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                    <CartesianGrid strokeDasharray='3 3' stroke='#e5e7eb' />
+                    <XAxis
+                      dataKey='subject'
+                      tick={{ fill: "#374151", fontSize: 11, fontWeight: 500 }}
+                      angle={-45}
+                      textAnchor='end'
+                      height={100}
+                      interval={0}
+                    />
+                    <YAxis
+                      domain={[0, 100]}
+                      tick={{ fill: "#6b7280", fontSize: 10 }}
+                      tickCount={6}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => [`${value}/100`, "Score"]}
+                      labelStyle={{
+                        color: "#374151",
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}
+                      contentStyle={{
+                        backgroundColor: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                      }}
+                    />
+                    <Bar
+                      dataKey='A'
+                      fill='#000000'
+                      radius={[4, 4, 0, 0]}
+                      stroke='#000000'
+                      strokeWidth={1}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className='mt-4 grid grid-cols-2 gap-4 text-sm'>
+                <div className='text-center p-2 bg-gray-50 rounded-lg'>
+                  <div className='font-semibold text-gray-800'>
+                    Highest Score
+                  </div>
+                  <div className='text-lg font-bold text-gray-900'>
+                    {Math.max(...radarData.map((item) => item.A))}/100
+                  </div>
+                </div>
+                <div className='text-center p-2 bg-gray-50 rounded-lg'>
+                  <div className='font-semibold text-gray-800'>
+                    Average Score
+                  </div>
+                  <div className='text-lg font-bold text-gray-900'>
+                    {Math.round(
+                      radarData.reduce((sum, item) => sum + item.A, 0) /
+                        radarData.length
+                    )}
+                    /100
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Third Row - Overall Comment & Transcript */}
+        <div className='grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8'>
+          {/* Overall Comment */}
+          <Card>
+            <CardHeader>
+              <CardTitle className='text-lg'>Overall Comment</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className='text-muted-foreground leading-relaxed'>
+                {evaluationData?.evaluation.overall_comment}
               </p>
             </CardContent>
           </Card>
