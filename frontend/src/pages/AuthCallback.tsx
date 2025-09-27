@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
+import { trackCandidateAuth } from "@/lib/analytics";
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -21,11 +22,16 @@ const AuthCallback = () => {
         email: session.user.email,
         // Backend will provide actual candidate data when needed
       }));
-      
+
+      // Track successful candidate authentication
+      trackCandidateAuth(session.user.email || 'unknown');
+
       console.log('AuthCallback: Stored token and basic user data for:', session.user.email);
 
       // Immediate redirect without toast to avoid delay
+      console.log('AuthCallback: About to redirect to /candidate/dashboard');
       navigate("/candidate/dashboard", { replace: true });
+      console.log('AuthCallback: Navigate called');
       
     } catch (error) {
       console.error('Error in processAuthentication:', error);

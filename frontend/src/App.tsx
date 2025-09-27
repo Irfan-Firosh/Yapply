@@ -2,7 +2,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CandidateAuthProvider } from "@/contexts/CandidateAuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -18,19 +19,37 @@ import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 import RoleManagement from "./pages/RoleManagement";
 import AuthHashRouter from "@/components/AuthHashRouter";
+import { initGA, trackPageView } from "@/lib/analytics";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <CandidateAuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AuthHashRouter />
-            <Routes>
+// Component to handle page view tracking
+const AnalyticsTracker = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    trackPageView(location.pathname + location.search);
+  }, [location]);
+
+  return null;
+};
+
+const App = () => {
+  useEffect(() => {
+    initGA();
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <CandidateAuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AnalyticsTracker />
+              <AuthHashRouter />
+              <Routes>
               <Route path='/' element={<LandingPage />} />
               <Route path='/company/login' element={<CompanyLogin />} />
               <Route
@@ -89,6 +108,7 @@ const App = () => (
       </CandidateAuthProvider>
     </AuthProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;

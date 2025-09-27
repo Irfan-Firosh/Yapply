@@ -15,6 +15,7 @@ import {
   Clock,
   RefreshCw,
 } from "lucide-react";
+import { trackMagicLinkSent } from "@/lib/analytics";
 
 interface InterviewBasic {
   id: number;
@@ -219,6 +220,9 @@ const MagicLinkSender = () => {
 
       const result = await response.json();
       setMagicLinkStatus(true);
+      
+      // Track the magic link send event
+      trackMagicLinkSent(interview.id.toString());
 
       // Update cache with new status
       setCachedData(`${MAGIC_LINK_CACHE_KEY}_${interview.id}`, true);
