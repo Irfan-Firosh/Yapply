@@ -9,6 +9,7 @@ import Navigation from "@/components/Navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Building2, User, Lock } from "lucide-react";
 import { useEffect } from "react";
+import { trackLogin } from "@/lib/analytics";
 
 const CompanyLogin = () => {
   const [username, setUsername] = useState("");
@@ -25,6 +26,39 @@ const CompanyLogin = () => {
     }
   }, [isAuthenticated, navigate]);
 
+  const handleDemoLogin = async () => {
+    setUsername("yapply");
+    setPassword("secret");
+    setIsLoading(true);
+
+    try {
+      const success = await login("yapply", "secret");
+      
+      if (success) {
+        trackLogin('company_demo');
+        toast({
+          title: "Demo login successful",
+          description: "Welcome to the company dashboard",
+        });
+        navigate("/company/dashboard");
+      } else {
+        toast({
+          title: "Demo login failed",
+          description: "There was an issue with the demo credentials",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Demo login failed",
+        description: "An error occurred during demo login. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -33,6 +67,7 @@ const CompanyLogin = () => {
       const success = await login(username, password);
       
       if (success) {
+        trackLogin('company_credentials');
         toast({
           title: "Login successful",
           description: "Welcome to the company dashboard",
@@ -108,13 +143,25 @@ const CompanyLogin = () => {
                 </div>
               </div>
               
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={isLoading}
-              >
-                {isLoading ? "Signing in..." : "Sign In"}
-              </Button>
+              <div className="space-y-3">
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Signing in..." : "Sign In"}
+                </Button>
+                
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={handleDemoLogin}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Signing in..." : "Try Demo"}
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>
