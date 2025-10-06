@@ -3,9 +3,58 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import Navigation from "@/components/Navigation";
 import { GridBackground, DotBackground } from "@/components/ui/grid-background";
-import { Bot, Calendar, Shield, Users, Zap, CheckCircle, ArrowRight, Sparkles } from "lucide-react";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import { Bot, Calendar, Shield, Users, Zap, CheckCircle, ArrowRight, Sparkles, Monitor } from "lucide-react";
+import Autoplay from "embla-carousel-autoplay";
+import { useRef, useState, useEffect } from "react";
 
 const LandingPage = () => {
+  const plugin = useRef(
+    Autoplay({ delay: 4000, stopOnInteraction: true })
+  );
+  
+  const [api, setApi] = useState<any>();
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    if (!api) {
+      return;
+    }
+
+    setCurrent(api.selectedScrollSnap());
+
+    api.on("select", () => {
+      setCurrent(api.selectedScrollSnap());
+    });
+  }, [api]);
+
+  const screenshots = [
+    {
+      src: "/analytics-dashboard.png",
+      alt: "Yapply Dashboard - Interview Management",
+      title: "Comprehensive Dashboard",
+      description: "Manage all your interviews from one central location"
+    },
+    {
+      src: "/candidate-management.png",
+      alt: "Yapply Analytics View",
+      title: "Smart Analytics",
+      description: "Deep insights and performance metrics for better hiring decisions"
+    },
+    {
+      src: "/dashboard-overview.png", 
+      alt: "Yapply Voice Agent Creation",
+      title: "AI-Powered Agent Creation",
+      description: "Create and customize AI agents for automated interviews"
+    },
+    {
+      src: "/ai-interview-interface.png",
+      alt: "Yapply Interview Scheduling",
+      title: "Interview Scheduling",
+      description: "Smart scheduling system with automated notifications"
+    }
+  ];
+
   const features = [
     {
       icon: Bot,
@@ -82,15 +131,24 @@ const LandingPage = () => {
             
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16 animate-fade-in" style={{animationDelay: "0.4s"}}>
-              <Link to="/admin">
-                <Button size="lg" className="btn-hero group">
-                  Start Your Free Trial
-                  <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
-              <Link to="/candidate/login">
+              <Button
+                size="lg"
+                className="btn-hero group"
+                onClick={() => {
+                  const element = document.getElementById('carousel-section');
+                  if (element) {
+                    const yOffset = -80; // Offset to show some space above the carousel
+                    const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                    window.scrollTo({ top: y, behavior: 'smooth' });
+                  }
+                }}
+              >
+                See It In Action
+                <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              </Button>
+              <Link to="/company/dashboard">
                 <Button size="lg" variant="outline" className="btn-ghost">
-                  Candidate Portal
+                  Company Dashboard
                 </Button>
               </Link>
             </div>
@@ -104,19 +162,93 @@ const LandingPage = () => {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </GridBackground>
 
-            {/* Stats Section */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-20 animate-fade-in" style={{animationDelay: "0.8s"}}>
-              {stats.map((stat, index) => (
-                <div key={index} className="text-center">
-                  <div className="text-3xl md:text-4xl font-bold text-primary mb-2">{stat.value}</div>
-                  <div className="text-sm text-muted-foreground font-medium">{stat.label}</div>
-                </div>
+      {/* Screenshots Carousel Section */}
+      <section id="carousel-section" className="py-16 bg-muted/20 border-b border-border">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-6 animate-slide-up">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-4">
+              <Monitor className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-primary">See It In Action</span>
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground">
+              Our Platform in Action
+            </h2>
+          </div>
+
+          <div className="relative max-w-4xl mx-auto">
+            <Carousel
+              plugins={[plugin.current]}
+              className="w-full"
+              setApi={setApi}
+              onMouseEnter={plugin.current.stop}
+              onMouseLeave={plugin.current.reset}
+            >
+              <CarouselContent>
+                {screenshots.map((screenshot, index) => (
+                  <CarouselItem key={index}>
+                    <div className="relative">
+                      <div className="overflow-hidden rounded-lg border border-border/20 bg-background shadow-sm">
+                        <div className="aspect-video relative overflow-hidden">
+                          <img
+                            src={screenshot.src}
+                            alt={screenshot.alt}
+                            className="w-full h-full object-contain bg-muted/10"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="p-4 text-center border-t border-border/10">
+                          <h3 className="text-lg font-medium mb-1 text-foreground">
+                            {screenshot.title}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            {screenshot.description}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="hidden md:flex -left-12 h-8 w-8 border-0 bg-background/60 hover:bg-background/90 shadow-none" />
+              <CarouselNext className="hidden md:flex -right-12 h-8 w-8 border-0 bg-background/60 hover:bg-background/90 shadow-none" />
+            </Carousel>
+
+            {/* Dot Indicators */}
+            <div className="flex justify-center gap-2 mt-6">
+              {screenshots.map((_, index) => (
+                <button
+                  key={index}
+                  className={`w-2 h-2 rounded-full transition-all duration-200 focus:outline-none ${
+                    index === current
+                      ? "bg-primary"
+                      : "bg-muted-foreground/40 hover:bg-muted-foreground/60"
+                  }`}
+                  onClick={() => api?.scrollTo(index)}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
               ))}
             </div>
           </div>
         </div>
-      </GridBackground>
+      </section>
+
+      {/* Stats Section */}
+      <section className="py-16 bg-background">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 animate-fade-in">
+            {stats.map((stat, index) => (
+              <div key={index} className="text-center">
+                <div className="text-3xl md:text-4xl font-bold text-primary mb-2">{stat.value}</div>
+                <div className="text-sm text-muted-foreground font-medium">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Features Section */}
       <section className="py-24 bg-muted/30">
@@ -168,15 +300,15 @@ const LandingPage = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-              <Link to="/admin">
+              <Link to="/company/login">
                 <Button size="lg" className="btn-hero group">
                   Start Free Trial
                   <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
-              <Link to="/admin/credentials">
+              <Link to="/company/dashboard">
                 <Button size="lg" variant="outline" className="btn-ghost">
-                  Schedule Demo
+                  Company Dashboard
                 </Button>
               </Link>
             </div>
@@ -194,10 +326,10 @@ const LandingPage = () => {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2">
               <Bot className="h-6 w-6 text-primary" />
-              <span className="font-semibold text-lg">InterviewAI</span>
+              <span className="font-semibold text-lg">Yapply</span>
             </div>
             <p className="text-muted-foreground text-center">
-              © 2024 InterviewAI. Built for modern hiring teams. Powered by AI.
+              © 2024 Yapply. Built for modern hiring teams by <a href="https://github.com/Irfan-Firosh" className="text-primary hover:text-primary/80 transition-colors">Irfan Firosh</a>.
             </p>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <a href="#" className="hover:text-primary transition-colors">Privacy</a>
