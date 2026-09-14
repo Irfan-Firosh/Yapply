@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import Navigation from "@/components/Navigation";
 import { useToast } from "@/hooks/use-toast";
+import { readErrorDetail } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import jsPDF from "jspdf";
 import {
@@ -116,7 +117,7 @@ const CandidateEvaluation = () => {
         );
 
         if (!evaluationResponse.ok) {
-          throw new Error("Failed to fetch evaluation data");
+          throw new Error(await readErrorDetail(evaluationResponse, "Failed to fetch evaluation data"));
         }
 
         const evaluation = await evaluationResponse.json();
@@ -126,7 +127,7 @@ const CandidateEvaluation = () => {
       console.error("Error fetching interview data:", error);
       toast({
         title: "Error",
-        description: "Failed to load interview data",
+        description: error instanceof Error ? error.message : "Failed to load interview data",
         variant: "destructive",
       });
     } finally {

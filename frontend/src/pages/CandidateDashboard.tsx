@@ -199,7 +199,8 @@ const CandidateDashboard = () => {
       console.error("Error starting interview:", error);
       toast({
         title: "Error Starting Interview",
-        description: "Failed to start the interview. Please try again.",
+        description:
+          error instanceof Error ? error.message : "Failed to start the interview. Please try again.",
         variant: "destructive",
       });
     } finally {

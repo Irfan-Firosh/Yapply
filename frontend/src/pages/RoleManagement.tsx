@@ -37,6 +37,7 @@ import { Separator } from "@/components/ui/separator";
 import Navigation from "@/components/Navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { readErrorDetail } from "@/lib/api";
 import {
   Plus,
   Edit,
@@ -487,7 +488,7 @@ const RoleManagement = () => {
       );
 
       if (!response.ok) {
-        throw new Error("Failed to create voice agent");
+        throw new Error(await readErrorDetail(response, "Failed to create voice agent"));
       }
 
       const result = await response.json();
@@ -513,7 +514,7 @@ const RoleManagement = () => {
       console.error("Error creating voice agent:", error);
       toast({
         title: "Error",
-        description: "Failed to create voice agent",
+        description: error instanceof Error ? error.message : "Failed to create voice agent",
         variant: "destructive",
       });
     } finally {

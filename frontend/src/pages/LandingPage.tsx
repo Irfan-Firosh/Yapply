@@ -329,7 +329,7 @@ const LandingPage = () => {
               <span className="font-semibold text-lg">Yapply</span>
             </div>
             <p className="text-muted-foreground text-center">
-              © 2024 Yapply. Built for modern hiring teams by <a href="https://github.com/Irfan-Firosh" className="text-primary hover:text-primary/80 transition-colors">Irfan Firosh</a>.
+              © Yapply [prev. MockMade]. Built for modern hiring teams by <a href="https://github.com/Irfan-Firosh" className="text-primary hover:text-primary/80 transition-colors">Irfan Firosh</a>.
             </p>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <a href="#" className="hover:text-primary transition-colors">Privacy</a>
