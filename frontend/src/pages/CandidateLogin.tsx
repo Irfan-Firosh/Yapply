@@ -20,7 +20,7 @@ const CandidateLogin = () => {
 
   useEffect(() => {
     if (token) {
-      navigate("/candidate/dashboard");
+      navigate("/candidate/dashboard", { replace: true });
     }
   }, [token, navigate]);
 
@@ -29,7 +29,7 @@ const CandidateLogin = () => {
     try {
       await login(candidateEmail);
       trackCandidateAuth(method);
-      navigate("/candidate/dashboard");
+      navigate("/candidate/dashboard", { replace: true });
     } catch (error) {
       toast({
         title: "Login failed",
