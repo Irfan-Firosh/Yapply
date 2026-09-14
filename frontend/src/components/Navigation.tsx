@@ -31,6 +31,9 @@ const Navigation = ({ variant = "landing" }: NavigationProps) => {
         </Link>
 
         <div className='flex items-center gap-6'>
+          <Link to='/candidate/login' className='nav-link'>
+            Candidate Login
+          </Link>
           <Link to='/company/login' className='nav-link'>
             Company Portal
           </Link>

@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Building2, User, Lock } from "lucide-react";
 import { useEffect } from "react";
 import { trackLogin } from "@/lib/analytics";
+import { DEMO_COMPANY } from "@/lib/demo";
 
 const CompanyLogin = () => {
   const [username, setUsername] = useState("");
@@ -27,12 +28,12 @@ const CompanyLogin = () => {
   }, [isAuthenticated, navigate]);
 
   const handleDemoLogin = async () => {
-    setUsername("yapply");
-    setPassword("secret");
+    setUsername(DEMO_COMPANY.username);
+    setPassword(DEMO_COMPANY.password);
     setIsLoading(true);
 
     try {
-      const success = await login("yapply", "secret");
+      const success = await login(DEMO_COMPANY.username, DEMO_COMPANY.password);
       
       if (success) {
         trackLogin('company_demo');
@@ -161,6 +162,9 @@ const CompanyLogin = () => {
                 >
                   {isLoading ? "Signing in..." : "Try Demo"}
                 </Button>
+                <p className="text-sm text-muted-foreground text-center">
+                  Demo credentials: <span className="font-mono">{DEMO_COMPANY.username}</span> / <span className="font-mono">{DEMO_COMPANY.password}</span>
+                </p>
               </div>
             </form>
           </CardContent>

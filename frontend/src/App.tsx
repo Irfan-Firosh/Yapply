@@ -14,11 +14,10 @@ import AdminDashboard from "./pages/AdminDashboard";
 import ScheduleInterview from "./pages/ScheduleInterview";
 import CandidateEvaluation from "./pages/CandidateEvaluation";
 import CandidateDashboard from "./pages/CandidateDashboard";
+import CandidateLogin from "./pages/CandidateLogin";
 import MagicLinkSender from "./pages/MagicLinkSender";
-import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 import RoleManagement from "./pages/RoleManagement";
-import AuthHashRouter from "@/components/AuthHashRouter";
 import { initGA, trackPageView } from "@/lib/analytics";
 
 const queryClient = new QueryClient();
@@ -48,7 +47,6 @@ const App = () => {
             <Sonner />
             <BrowserRouter>
               <AnalyticsTracker />
-              <AuthHashRouter />
               <Routes>
               <Route path='/' element={<LandingPage />} />
               <Route path='/company/login' element={<CompanyLogin />} />
@@ -92,7 +90,7 @@ const App = () => {
                   </ProtectedRoute>
                 }
               />
-              <Route path='/auth/callback' element={<AuthCallback />} />
+              <Route path='/candidate/login' element={<CandidateLogin />} />
               <Route
                 path='/candidate/dashboard'
                 element={
