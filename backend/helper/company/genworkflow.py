@@ -365,14 +365,19 @@ def create_automated_interview_workflow(
     
     return workflow
 
-def post_workflow(workflow: Dict[str, Any]):
+def post_workflow(workflow: Dict[str, Any]) -> str:
     headers = {
         "Authorization": f"Bearer {os.getenv('VAPI_API_KEY')}",
         "Content-Type": "application/json"
     }
 
-    response = requests.post("https://api.vapi.ai/workflow", headers=headers, json=workflow)
-    return response.json()["id"]
+    response = requests.post("https://api.vapi.ai/workflow", headers=headers, json=workflow, timeout=30)
+    if response.status_code >= 400:
+        raise RuntimeError(f"Vapi workflow creation failed: {response.status_code} - {response.text}")
+    workflow_id = response.json().get("id")
+    if not workflow_id:
+        raise RuntimeError("Vapi workflow response had no id")
+    return workflow_id
 
 
 if __name__ == "__main__":

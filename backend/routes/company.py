@@ -11,10 +11,14 @@ import uuid
 from helper.company.genworkflow import create_automated_interview_workflow, post_workflow
 from helper.company.transcript import retrive_transcript, grade_transcript
 import json
+import logging
+import requests
+from utils.quota import require_quota
 
 dotenv.load_dotenv()
 
 router = APIRouter(prefix="/company", tags=["company"])
+logger = logging.getLogger(__name__)
 
 
 class Company(BaseModel):
@@ -273,6 +277,7 @@ async def create_workflow_for_company_role(
     if not questions:
         raise HTTPException(status_code=404, detail="Questions not found")
     questions = [question["question_text"] for question in questions]
+    require_quota(supabase, "workflow")
     workflow = create_automated_interview_workflow(
         questions=questions,
         company_name=current_company.username,
@@ -282,7 +287,13 @@ async def create_workflow_for_company_role(
         model="gpt-4o",
         timeout_seconds=45
     )
-    workflow_id = post_workflow(workflow)
+    try:
+        workflow_id = post_workflow(workflow)
+    except (RuntimeError, requests.RequestException) as exc:
+        logger.exception("Vapi workflow creation failed for role %s", role_id)
+        raise HTTPException(
+            status_code=502, detail="The voice agent provider rejected the request. Try again later."
+        ) from exc
     supabase.table("roles").update({"vapi_workflow_id": workflow_id}).eq("id", role_id).execute()
     return {"vapi_workflow_id": workflow_id}
 
@@ -384,6 +395,7 @@ async def evaluate_interview_transcript(
     if not interview.get("call_id"):
         raise HTTPException(status_code=409, detail="This interview has no recorded call yet.")
 
+    require_quota(supabase, "evaluation")
     transcript = retrive_transcript(interview["call_id"])
     evaluation = json.loads(grade_transcript(transcript))
     supabase.table("interviews").update(
