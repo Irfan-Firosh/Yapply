@@ -29,3 +29,11 @@ def test_every_table_has_row_level_security():
 def test_demo_candidate_is_seeded_as_sample():
     assert "'candidate@example.com'" in MIGRATION
     assert MIGRATION.count(", true)") >= 4
+
+
+def test_quota_functions_return_rows_and_are_granted_to_service_role():
+    assert "returns table(allowed boolean)" in MIGRATION
+    assert "returns table(ok boolean)" in MIGRATION
+    assert "grant execute on function consume_quota(text, int) to service_role;" in MIGRATION
+    assert "grant execute on function reset_demo() to service_role;" in MIGRATION
+    assert "set search_path = public as" not in MIGRATION

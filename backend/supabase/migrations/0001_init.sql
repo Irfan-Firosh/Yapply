@@ -71,13 +71,13 @@ alter table interviews enable row level security;
 alter table usage_counters enable row level security;
 alter table demo_workflows enable row level security;
 
-create function consume_quota(p_action text, p_limit int) returns boolean
-language plpgsql security definer set search_path = public as $$
+create function consume_quota(p_action text, p_limit int) returns table(allowed boolean)
+language plpgsql security definer set search_path = public, pg_temp as $$
 declare
   v_count int;
 begin
   if p_limit <= 0 then
-    return false;
+    return query select false; return;
   end if;
   insert into usage_counters (day, action, count)
   values ((now() at time zone 'utc')::date, p_action, 1)
@@ -85,11 +85,11 @@ begin
     set count = usage_counters.count + 1
     where usage_counters.count < p_limit
   returning count into v_count;
-  return v_count is not null;
+  return query select v_count is not null;
 end $$;
 
-create function reset_demo() returns void
-language plpgsql security definer set search_path = public as $$
+create function reset_demo() returns table(ok boolean)
+language plpgsql security definer set search_path = public, pg_temp as $$
 declare
   v_company uuid;
   v_ml_role bigint;
@@ -196,7 +196,11 @@ AI: Thanks Lena, that's all the questions I have.$transcript$,
        'key_strengths', 'Candour about gaps; clear communication'
      ),
      v_fe_workflow, true);
+
+  return query select true;
 end $$;
 
 revoke execute on function consume_quota(text, int) from public, anon, authenticated;
 revoke execute on function reset_demo() from public, anon, authenticated;
+grant execute on function consume_quota(text, int) to service_role;
+grant execute on function reset_demo() to service_role;

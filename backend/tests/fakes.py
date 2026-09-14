@@ -119,5 +119,7 @@ class FakeSupabase:
             allowed = params["p_limit"] > 0 and used < params["p_limit"]
             if allowed:
                 self.quota_used = {**self.quota_used, params["p_action"]: used + 1}
-            return _FakeRpc(allowed)
-        return _FakeRpc(None)
+            return _FakeRpc([{"allowed": allowed}])
+        if name == "reset_demo":
+            return _FakeRpc([{"ok": True}])
+        return _FakeRpc([])

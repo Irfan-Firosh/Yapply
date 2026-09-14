@@ -24,6 +24,26 @@ def test_zero_limit_blocks_immediately(db, monkeypatch):
     assert exc.value.status_code == 429
 
 
+class _EmptyRpcResponse:
+    data: list = []
+
+
+class _EmptyRpcClient:
+    """Stands in for a postgrest client whose RPC call returned zero rows."""
+
+    def rpc(self, _name, _params):
+        return self
+
+    def execute(self):
+        return _EmptyRpcResponse()
+
+
+def test_empty_rpc_rows_are_treated_as_not_allowed():
+    with pytest.raises(HTTPException) as exc:
+        require_quota(_EmptyRpcClient(), "call")
+    assert exc.value.status_code == 429
+
+
 def _add_role_with_question(db) -> dict:
     role = db.insert_row("roles", {"company_id": "11111111-1111-1111-1111-111111111111", "title": "Engineer", "vapi_workflow_id": None})
     db.insert_row("questions", {"role_id": role["id"], "question_text": "Why us?", "question_type": "text", "difficulty": "easy"})

@@ -12,8 +12,9 @@ LIMITS = {
 def require_quota(client, action: str) -> None:
     env_name, default_limit, label = LIMITS[action]
     limit = int(os.getenv(env_name, str(default_limit)))
-    allowed = client.rpc("consume_quota", {"p_action": action, "p_limit": limit}).execute().data
-    if allowed is not True:
+    rows = client.rpc("consume_quota", {"p_action": action, "p_limit": limit}).execute().data
+    allowed = bool(rows) and rows[0].get("allowed") is True
+    if not allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Daily demo limit reached for {label}. Resets at 00:00 UTC.",
