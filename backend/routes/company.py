@@ -1,14 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Form
+from fastapi import APIRouter, HTTPException, Depends, Form
 from typing import Annotated
 from pydantic import BaseModel
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timezone
 from utils.security import verify_password
-import os
+from utils.tokens import CREDENTIALS_EXCEPTION, issue_token, read_token
 import dotenv
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from datetime import timedelta, timezone
-import jwt
-from jwt.exceptions import InvalidTokenError
 from db_functions.access_table import get_supabase_client
 from helper.company.gen_credentials import gen_magic_link
 import uuid
@@ -20,13 +17,6 @@ dotenv.load_dotenv()
 
 router = APIRouter(prefix="/company", tags=["company"])
 
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-class TokenData(BaseModel):
-    username: str | None = None
 
 class Company(BaseModel):
     id: int
@@ -74,68 +64,40 @@ class CompanyRoleOut(CompanyRole):
 company_oatuh2_scheme = OAuth2PasswordBearer(tokenUrl="/api/company/token")
 supabase = get_supabase_client()
 
-def get_company(username: str):
-    company_dict = supabase.table("company").select("*").eq("username", username).execute().data[0]
-    if company_dict:
-        return CompanyInDB(**company_dict)
-    return None
+
+def get_company(username: str) -> CompanyInDB | None:
+    rows = supabase.table("company").select("*").eq("username", username).execute().data
+    return CompanyInDB(**rows[0]) if rows else None
 
 
-def authenticate_company(username: str, password: str):
+def authenticate_company(username: str, password: str) -> CompanyInDB | None:
     company = get_company(username)
-    if not company:
-        return False
-    if not verify_password(password, company.hashed_password):
-        return False
+    if not company or not verify_password(password, company.hashed_password):
+        return None
     return company
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = expires_delta + datetime.now(timezone.utc)
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=int(os.getenv("TOKEN_EXPIRY_TIME")))
-    
-    to_encode.update({'exp': expire})
-    encoded_jwt = jwt.encode(to_encode, os.getenv("JWT_SECRET_KEY"), algorithm="HS256")
-    return encoded_jwt
 
-async def get_current_company(token: Annotated[str, Depends(company_oatuh2_scheme)]):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, os.getenv("JWT_SECRET_KEY"), algorithms=["HS256"])
-        username = payload.get("sub")
-        if not username:
-            raise credentials_exception
-        token_data = TokenData(username=username)
-    except InvalidTokenError:
-        raise credentials_exception
-    company = get_company(username=token_data.username)
+async def get_current_company(token: Annotated[str, Depends(company_oatuh2_scheme)]) -> CompanyInDB:
+    company = get_company(read_token(token, "company"))
     if not company:
-        raise credentials_exception
+        raise CREDENTIALS_EXCEPTION
     return company
 
-async def get_current_active_company(current_company: Annotated[Company, Depends(get_current_company)]):
+
+async def get_current_active_company(
+    current_company: Annotated[CompanyInDB, Depends(get_current_company)],
+) -> CompanyInDB:
     if current_company.disabled:
         raise HTTPException(status_code=400, detail="Inactive company")
-    supabase.rpc("set_company_session", {"company_id": current_company.company_id}).execute()
     return current_company
+
 
 @router.post("/token")
 async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     company = authenticate_company(form_data.username, form_data.password)
     if not company:
         raise HTTPException(status_code=401, detail="Incorrect username or password")
-    access_token_expires = timedelta(minutes=int(os.getenv("TOKEN_EXPIRY_TIME")))
-    data = {
-        "sub": company.username
-    }
-    access_token = create_access_token(data=data, expires_delta=access_token_expires)
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": issue_token(company.username, "company"), "token_type": "bearer"}
 
 @router.get("/", summary="Get company info", response_model=Company)
 async def get_company_info(current_company: Annotated[Company, Depends(get_current_active_company)]):
