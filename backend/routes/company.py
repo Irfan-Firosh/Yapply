@@ -7,7 +7,6 @@ from utils.tokens import CREDENTIALS_EXCEPTION, issue_token, read_token
 import dotenv
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from db_functions.access_table import get_supabase_client
-from helper.company.gen_credentials import gen_magic_link
 import uuid
 from helper.company.genworkflow import create_automated_interview_workflow, post_workflow
 from helper.company.transcript import retrive_transcript, grade_transcript
@@ -103,43 +102,39 @@ async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm,
 async def get_company_info(current_company: Annotated[Company, Depends(get_current_active_company)]):
     return current_company
 
+def to_interview_basic(row: dict) -> InterviewBasic:
+    evaluation = row.get("ai_evaluation")
+    if isinstance(evaluation, dict):
+        return InterviewBasic(**{**row, "ai_evaluation": json.dumps(evaluation)})
+    return InterviewBasic(**row)
+
+
+def get_owned_interview(interview_id: int, company: CompanyInDB) -> dict:
+    rows = (
+        supabase.table("interviews")
+        .select("*")
+        .eq("id", interview_id)
+        .eq("company_id", company.company_id)
+        .execute()
+        .data
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="Interview not found")
+    return rows[0]
+
+
 @router.get("/interviews", summary="Get company interviews", response_model=list[InterviewBasic])
-async def get_company_interviews(current_company: Annotated[Company, Depends(get_current_active_company)]):
-    interviews = supabase.table("interviews").select("*").eq("company_id", current_company.company_id).execute().data
-    
-    # Convert ai_evaluation from dict to JSON string if it exists
-    for interview_dict in interviews:
-        if interview_dict.get("ai_evaluation") and isinstance(interview_dict["ai_evaluation"], dict):
-            import json
-            interview_dict["ai_evaluation"] = json.dumps(interview_dict["ai_evaluation"])
-    
-    return [InterviewBasic(**interview_dict) for interview_dict in interviews]
+async def get_company_interviews(current_company: Annotated[CompanyInDB, Depends(get_current_active_company)]):
+    rows = supabase.table("interviews").select("*").eq("company_id", current_company.company_id).execute().data
+    return [to_interview_basic(row) for row in rows]
+
 
 @router.get("/interviews/{interview_id}", summary="Get company interview", response_model=InterviewBasic)
-async def get_company_interview(interview_id: int, current_company: Annotated[Company, Depends(get_current_active_company)]):
-    interview = supabase.table("interviews").select("*").eq("id", interview_id).execute().data[0]
-    
-    # Convert ai_evaluation from dict to JSON string if it exists
-    if interview.get("ai_evaluation") and isinstance(interview["ai_evaluation"], dict):
-        import json
-        interview["ai_evaluation"] = json.dumps(interview["ai_evaluation"])
-    
-    return InterviewBasic(**interview)
-
-@router.get("/interviews/{interview_id}/send-link", summary="Create company interview link")
-async def create_company_interview_link(interview_id: int, current_company: Annotated[Company, Depends(get_current_active_company)]):
-        interview = supabase.table("interviews").select("*").eq("id", interview_id).execute().data[0]
-        if not interview:
-            raise HTTPException(status_code=404, detail="Interview not found")
-        candidate_email = interview["candidate_email"]
-        gen_magic_link(candidate_email)
-        supabase.table("interviews").update({"magiclink_status": True}).eq("id", interview_id).execute()
-        return {"message": "Magic link sent to candidate"}
-
-@router.get("/interviews/{interview_id}/link-status", summary="Get company interview link")
-async def get_company_interview_link(interview_id: int, current_company: Annotated[Company, Depends(get_current_active_company)]):
-    interview = supabase.table("interviews").select("*").eq("id", interview_id).execute().data[0]
-    return {"magiclink_status": interview["magiclink_status"]}
+async def get_company_interview(
+    interview_id: int,
+    current_company: Annotated[CompanyInDB, Depends(get_current_active_company)],
+):
+    return to_interview_basic(get_owned_interview(interview_id, current_company))
 
 @router.post("/interviews", summary="Create company interview", response_model=InterviewBasic)
 async def create_company_interview(
@@ -156,7 +151,7 @@ async def create_company_interview(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "status": "Pending",
         "candidate_name": candidate_name,
-        "candidate_email": candidate_email,
+        "candidate_email": candidate_email.strip().lower(),
         "candidate_phone": candidate_phone,
         "position": position if position else None,
         "interview_date": date.isoformat() if date else None,
@@ -170,12 +165,13 @@ async def create_company_interview(
         raise HTTPException(status_code=400, detail="Failed to create interview")
 
 @router.delete("/interviews/{interview_id}", summary="Delete company interview")
-async def delete_company_interview(interview_id: int, current_company: Annotated[Company, Depends(get_current_active_company)]):
-    interview = supabase.table("interviews").delete().eq("id", interview_id).execute()
-    if interview:
-        return {"message": "Interview deleted successfully"}
-    else:
-        raise HTTPException(status_code=404, detail="Interview not found")
+async def delete_company_interview(
+    interview_id: int,
+    current_company: Annotated[CompanyInDB, Depends(get_current_active_company)],
+):
+    get_owned_interview(interview_id, current_company)
+    supabase.table("interviews").delete().eq("id", interview_id).eq("company_id", current_company.company_id).execute()
+    return {"message": "Interview deleted successfully"}
 
 @router.get("/roles", summary="Get company roles", response_model=list[CompanyRoleOut])
 async def get_company_roles(current_company: Annotated[Company, Depends(get_current_active_company)]):
@@ -380,21 +376,17 @@ async def delete_question(
 @router.get("/interviews/{interview_id}/evaluate-transcript", summary="Evaluate interview transcript")
 async def evaluate_interview_transcript(
     interview_id: int,
-    current_company: Annotated[Company, Depends(get_current_active_company)],
+    current_company: Annotated[CompanyInDB, Depends(get_current_active_company)],
 ):
-    interview = supabase.table("interviews").select("*").eq("id", interview_id).execute().data
-    if not interview:
-        raise HTTPException(status_code=404, detail="Interview not found")
-    
-    interview_data = interview[0]
-    evaluation = interview_data.get("ai_evaluation")
-    
-    if not evaluation:
-        transcript = retrive_transcript(interview_data["call_id"])
-        supabase.table("interviews").update({"transcript": transcript}).eq("id", interview_id).execute()
-        evaluation = grade_transcript(transcript)
-        supabase.table("interviews").update({"ai_evaluation": json.loads(evaluation)}).eq("id", interview_id).execute()
-    else:
-        transcript = interview_data.get("transcript", "")
-    
+    interview = get_owned_interview(interview_id, current_company)
+    if interview.get("ai_evaluation"):
+        return {"transcript": interview.get("transcript") or "", "evaluation": interview["ai_evaluation"]}
+    if not interview.get("call_id"):
+        raise HTTPException(status_code=409, detail="This interview has no recorded call yet.")
+
+    transcript = retrive_transcript(interview["call_id"])
+    evaluation = json.loads(grade_transcript(transcript))
+    supabase.table("interviews").update(
+        {"transcript": transcript, "ai_evaluation": evaluation}
+    ).eq("id", interview_id).execute()
     return {"transcript": transcript, "evaluation": evaluation}
