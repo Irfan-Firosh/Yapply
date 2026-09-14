@@ -1,106 +1,107 @@
-from typing import Optional, Annotated
-from fastapi import APIRouter, HTTPException, Request, Depends, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import logging
+from typing import Annotated
+
+import requests
+from fastapi import APIRouter, Depends, Form, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
-import os
-import dotenv
+
 from db_functions.access_table import get_supabase_client
-from helper.candidate.create_call import make_call, retrive_transcript
-dotenv.load_dotenv()
+from helper.candidate.create_call import make_call
+from utils.quota import require_quota
+from utils.tokens import CREDENTIALS_EXCEPTION, issue_token, read_token
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/candidate", tags=["candidate"])
 supabase = get_supabase_client()
-
 security = HTTPBearer()
+
+SAMPLE_CALL_MESSAGE = (
+    "Sample interviews can't place calls. Schedule an interview with your own "
+    "phone number and log in with that email."
+)
+
 
 class Candidate(BaseModel):
     candidate_name: str
-    candidate_email: str
+    candidate_email: str | None = None
     position: str | None = None
     candidate_phone: str
 
+
 class CandidateInDB(Candidate):
+    id: int
     company_id: str
     vapi_workflow_id: str | None = None
+    is_sample: bool = False
 
 
-def verify_candidate(email: str):
-    try:
-        candidate_dict = supabase.table("interviews").select("*").eq("candidate_email", email).execute().data
-        
-        if candidate_dict and len(candidate_dict) > 0:
-            return CandidateInDB(**candidate_dict[0])
-    except Exception:
-        pass
-    return None
-
-async def get_current_candidate(credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
+@router.post("/token", summary="Log in as a candidate with the interview email")
+async def login_candidate(email: Annotated[str, Form()]):
+    rows = (
+        supabase.table("interviews")
+        .select("id")
+        .eq("candidate_email", email.strip().lower())
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+        .data
     )
-    
-    try:
-        token = credentials.credentials
-        
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No interview found for this email")
+    return {"access_token": issue_token(str(rows[0]["id"]), "candidate"), "token_type": "bearer"}
 
-        user_response = supabase.auth.get_user(token)
-        
-        if not user_response.user:
-            raise credentials_exception
-            
-        candidate_email = user_response.user.email
-        auth_user_id = user_response.user.id
-        
-        if not candidate_email:
-            raise credentials_exception
-            
-        candidate = verify_candidate(candidate_email)
-        
-        if not candidate:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Candidate not found in interviews"
-            )
-        
-        try:
-            supabase.table("interviews").update({
-                "candidate_auth": auth_user_id
-            }).eq("candidate_email", candidate_email).execute()
-        except Exception:
-            pass
-            
-        return candidate
-        
-    except Exception:
-        raise credentials_exception
+
+async def get_current_candidate(
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+) -> CandidateInDB:
+    interview_id = read_token(credentials.credentials, "candidate")
+    if not interview_id.isdigit():
+        raise CREDENTIALS_EXCEPTION
+    rows = supabase.table("interviews").select("*").eq("id", int(interview_id)).execute().data
+    if not rows:
+        raise CREDENTIALS_EXCEPTION
+    return CandidateInDB(**rows[0])
 
 
 @router.get("/dashboard", summary="Get candidate dashboard", response_model=Candidate)
-async def get_candidate_dashboard(current_candidate: Annotated[Candidate, Depends(get_current_candidate)]):
+async def get_candidate_dashboard(current_candidate: Annotated[CandidateInDB, Depends(get_current_candidate)]):
     return current_candidate
+
 
 @router.get("/profile", summary="Get candidate profile", response_model=Candidate)
-async def get_candidate_profile(current_candidate: Annotated[Candidate, Depends(get_current_candidate)]):
+async def get_candidate_profile(current_candidate: Annotated[CandidateInDB, Depends(get_current_candidate)]):
     return current_candidate
 
+
 @router.get("/company", summary="Get company name", response_model=str)
-async def get_company_name(current_candidate: Annotated[Candidate, Depends(get_current_candidate)]):
-    company_uid = verify_candidate(current_candidate.candidate_email).company_id
-    company = supabase.table("company").select("*").eq("company_id", company_uid).execute().data[0]
-    return company["username"]
+async def get_company_name(current_candidate: Annotated[CandidateInDB, Depends(get_current_candidate)]):
+    rows = supabase.table("company").select("username").eq("company_id", current_candidate.company_id).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="Company not found")
+    return rows[0]["username"]
 
-@router.get("/call", summary="Get phone call", response_model=str)
-async def get_phone_call(current_candidate: Annotated[Candidate, Depends(get_current_candidate)]):
-    return "phone call"
 
-@router.get("/createcall", summary="Create phone call", response_model=str)
-async def get_vapi_workflow_id(current_candidate: Annotated[Candidate, Depends(get_current_candidate)]):
-    workflow_id = current_candidate.vapi_workflow_id
-    call_id = make_call(workflow_id, current_candidate.candidate_phone, current_candidate.candidate_name)
-    supabase.table("interviews").update({"call_id": call_id, "status": "Completed"}).eq("candidate_email", current_candidate.candidate_email).execute()
+@router.get("/createcall", summary="Start the AI phone interview", response_model=str)
+async def create_call(current_candidate: Annotated[CandidateInDB, Depends(get_current_candidate)]):
+    if current_candidate.is_sample:
+        raise HTTPException(status_code=400, detail=SAMPLE_CALL_MESSAGE)
+    if not current_candidate.vapi_workflow_id:
+        raise HTTPException(status_code=409, detail="This interview's role has no voice agent yet.")
+    require_quota(supabase, "call")
+    try:
+        call_id = make_call(
+            current_candidate.vapi_workflow_id,
+            current_candidate.candidate_phone,
+            current_candidate.candidate_name,
+        )
+    except (RuntimeError, requests.RequestException) as exc:
+        logger.exception("Vapi call failed for interview %s", current_candidate.id)
+        raise HTTPException(
+            status_code=502, detail="Could not start the call. Check the phone number and try again."
+        ) from exc
+    supabase.table("interviews").update({"call_id": call_id, "status": "Completed"}).eq(
+        "id", current_candidate.id
+    ).execute()
     return call_id
-
-
-
