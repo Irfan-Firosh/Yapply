@@ -80,10 +80,6 @@ export const trackSignup = (method: string) => {
   trackEvent('sign_up', 'authentication', method);
 };
 
-export const trackMagicLinkSent = (interviewId: string) => {
-  trackEvent('magic_link_sent', 'interview', `interview_${interviewId}`);
-};
-
 export const trackCandidateAuth = (method: string) => {
   trackEvent('candidate_login', 'authentication', method);
 };

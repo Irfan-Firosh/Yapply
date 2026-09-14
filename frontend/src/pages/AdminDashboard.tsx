@@ -24,7 +24,7 @@ import {
   FileText,
   TrendingUp,
   RefreshCw,
-  Mail,
+  KeyRound,
   Trash2,
   Briefcase,
 } from "lucide-react";
@@ -596,8 +596,8 @@ const AdminDashboard = () => {
                               variant='ghost'
                               size='sm'
                               className='flex items-center gap-2'>
-                              <Mail className='h-4 w-4' />
-                              Magic Link
+                              <KeyRound className='h-4 w-4' />
+                              Candidate Access
                             </Button>
                           </Link>
                           <AlertDialog>

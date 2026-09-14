@@ -15,7 +15,7 @@ import ScheduleInterview from "./pages/ScheduleInterview";
 import CandidateEvaluation from "./pages/CandidateEvaluation";
 import CandidateDashboard from "./pages/CandidateDashboard";
 import CandidateLogin from "./pages/CandidateLogin";
-import MagicLinkSender from "./pages/MagicLinkSender";
+import CandidateAccess from "./pages/CandidateAccess";
 import NotFound from "./pages/NotFound";
 import RoleManagement from "./pages/RoleManagement";
 import { initGA, trackPageView } from "@/lib/analytics";
@@ -86,7 +86,7 @@ const App = () => {
                 path='/company/magic-link/:interview_id'
                 element={
                   <ProtectedRoute>
-                    <MagicLinkSender />
+                    <CandidateAccess />
                   </ProtectedRoute>
                 }
               />
