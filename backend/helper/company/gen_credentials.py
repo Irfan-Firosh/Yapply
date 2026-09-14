@@ -1,9 +1,9 @@
-from db_functions.access_table import supabase
+from db_functions.access_table import get_supabase_client
 
 
 def gen_magic_link(email: str):
     try:
-        res = supabase.auth.sign_in_with_otp({
+        res = get_supabase_client().auth.sign_in_with_otp({
             "email": email,
             "options": {
                 "emailRedirectTo": "http://localhost:8080/candidate/dashboard",

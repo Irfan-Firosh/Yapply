@@ -1,29 +1,35 @@
-from fastapi import FastAPI, HTTPException, Depends
-from routes.jwttoken import router as auth_router, get_current_active_user
+import os
 from typing import Annotated
+
 import dotenv
-from routes.company import router as company_router
-from routes.candidate import router as candidate_router
-import uvicorn
+from fastapi import APIRouter, FastAPI, Header, HTTPException
 
 dotenv.load_dotenv()
 
+from db_functions.access_table import get_supabase_client  # noqa: E402
+from routes.candidate import router as candidate_router  # noqa: E402
+from routes.company import router as company_router  # noqa: E402
 
-app = FastAPI()
+app = FastAPI(title="Yapply API")
 
-UNAUTHORIZED_USER = HTTPException(status_code=401, detail="Unauthorized")
- 
-app.include_router(auth_router)
-app.include_router(company_router)
-app.include_router(candidate_router)
+api = APIRouter(prefix="/api")
+api.include_router(company_router)
+api.include_router(candidate_router)
 
 
-@app.get("/")
-async def read_root():
-    return {"message": "Hello World"}
+@api.get("/health")
+async def health():
+    get_supabase_client().table("company").select("id").limit(1).execute()
+    return {"status": "ok"}
 
-@app.get("/company")
-async def get_company(current_user: Annotated[str, Depends(get_current_active_user)]):
-    if current_user is None:
-        raise UNAUTHORIZED_USER
-    return {"message": "Hello World"}
+
+@api.get("/cron/daily")
+async def cron_daily(authorization: Annotated[str | None, Header()] = None):
+    secret = os.getenv("CRON_SECRET")
+    if not secret or authorization != f"Bearer {secret}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    get_supabase_client().rpc("reset_demo", {}).execute()
+    return {"status": "ok"}
+
+
+app.include_router(api)

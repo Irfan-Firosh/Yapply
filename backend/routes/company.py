@@ -71,7 +71,7 @@ class CompanyRoleOut(CompanyRole):
     vapi_workflow_id: str | None = None
 
 
-company_oatuh2_scheme = OAuth2PasswordBearer(tokenUrl="company/token")
+company_oatuh2_scheme = OAuth2PasswordBearer(tokenUrl="/api/company/token")
 supabase = get_supabase_client()
 
 def get_company(username: str):
