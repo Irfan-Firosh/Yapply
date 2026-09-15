@@ -9,6 +9,7 @@ os.environ.update({
     "JWT_SECRET_KEY": "test-jwt-secret",
     "TOKEN_EXPIRY_TIME": "60",
     "CRON_SECRET": "cron-secret",
+    "CALLS_ENABLED": "true",
 })
 
 from db_functions import access_table  # noqa: E402

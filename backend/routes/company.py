@@ -13,6 +13,7 @@ from helper.company.transcript import retrive_transcript, grade_transcript
 import json
 import logging
 import requests
+from utils.features import calls_enabled
 from utils.quota import require_quota
 
 dotenv.load_dotenv()
@@ -179,7 +180,7 @@ async def delete_company_interview(
 
 @router.get("/roles", summary="Get company roles", response_model=list[CompanyRoleOut])
 async def get_company_roles(current_company: Annotated[Company, Depends(get_current_active_company)]):
-    roles = supabase.table("roles").select("*").eq("company_id", current_company.company_id).not_.is_("vapi_workflow_id", "null").execute().data
+    roles = supabase.table("roles").select("*").eq("company_id", current_company.company_id).execute().data
     return [CompanyRoleOut(**role_dict) for role_dict in roles]
 
 @router.get("/roles/{role_id}", summary="Get company role by ID", response_model=CompanyRoleOut)
@@ -277,6 +278,8 @@ async def create_workflow_for_company_role(
     if not questions:
         raise HTTPException(status_code=404, detail="Questions not found")
     questions = [question["question_text"] for question in questions]
+    if not calls_enabled():
+        raise HTTPException(status_code=503, detail="Voice agent creation is turned off in this demo.")
     require_quota(supabase, "workflow")
     workflow = create_automated_interview_workflow(
         questions=questions,

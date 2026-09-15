@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from db_functions.access_table import get_supabase_client
 from helper.candidate.create_call import make_call
+from utils.features import calls_enabled
 from utils.quota import require_quota
 from utils.tokens import CREDENTIALS_EXCEPTION, issue_token, read_token
 
@@ -20,6 +21,11 @@ security = HTTPBearer()
 SAMPLE_CALL_MESSAGE = (
     "Sample interviews can't place calls. Schedule an interview with your own "
     "phone number and log in with that email."
+)
+
+CALLS_DISABLED_MESSAGE = (
+    "Live phone interviews are turned off in this demo. The scheduled interviews, "
+    "transcripts and AI evaluations are all real."
 )
 
 
@@ -90,6 +96,8 @@ async def get_company_name(current_candidate: Annotated[CandidateInDB, Depends(g
 
 @router.get("/createcall", summary="Start the AI phone interview", response_model=str)
 async def create_call(current_candidate: Annotated[CandidateInDB, Depends(get_current_candidate)]):
+    if not calls_enabled():
+        raise HTTPException(status_code=503, detail=CALLS_DISABLED_MESSAGE)
     if current_candidate.is_sample:
         raise HTTPException(status_code=400, detail=SAMPLE_CALL_MESSAGE)
     if not current_candidate.vapi_workflow_id:

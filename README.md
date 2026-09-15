@@ -5,6 +5,7 @@ AI voice interviews: a company schedules a candidate, an AI interviewer phones t
 **Live demo:** https://yapply.irfanfirosh.app
 - Company login: `yapply` / `secret`
 - Candidate login: `candidate@example.com` (sample interview; to hear a real call, schedule an interview with your own email and phone, then log in with that email)
+- Live phone interviews are currently disabled (Vapi retired Workflows on 2026-08-18); scheduled interviews, transcripts and AI evaluations are real.
 
 ## Stack
 
