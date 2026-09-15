@@ -18,11 +18,40 @@ async def test_login_unknown_email_is_401(client, db):
     assert response.json()["detail"] == "No interview found for this email"
 
 
+async def test_login_blank_email_is_401_even_with_blank_email_interview(client, db):
+    add_interview(db, candidate_email="")
+    response = await client.post("/api/candidate/token", data={"email": ""})
+    assert response.status_code == 401
+    assert response.json()["detail"] == "No interview found for this email"
+
+
+async def test_login_whitespace_only_email_is_401_even_with_blank_email_interview(client, db):
+    add_interview(db, candidate_email="")
+    response = await client.post("/api/candidate/token", data={"email": "   "})
+    assert response.status_code == 401
+    assert response.json()["detail"] == "No interview found for this email"
+
+
 async def test_dashboard_returns_the_token_interview(client, db):
     interview = add_interview(db, candidate_name="Grace Hopper")
     response = await client.get("/api/candidate/dashboard", headers=candidate_headers(interview["id"]))
     assert response.status_code == 200
     assert response.json()["candidate_name"] == "Grace Hopper"
+
+
+async def test_dashboard_returns_status_and_schedule(client, db):
+    interview = add_interview(
+        db,
+        status="Scheduled",
+        interview_date="2026-03-01",
+        interview_time="09:30:00",
+    )
+    response = await client.get("/api/candidate/dashboard", headers=candidate_headers(interview["id"]))
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "Scheduled"
+    assert body["interview_date"] == "2026-03-01"
+    assert body["interview_time"] == "09:30:00"
 
 
 async def test_candidate_route_rejects_company_token(client, db):

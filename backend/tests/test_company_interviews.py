@@ -72,6 +72,40 @@ async def test_evaluate_without_call_is_409(client, db):
     assert response.status_code == 409
 
 
+async def test_evaluate_missing_transcript_is_409_and_row_untouched(client, db, monkeypatch):
+    add_company(db)
+    own = add_interview(db, call_id="call_1", status="Completed")
+    monkeypatch.setattr("routes.company.retrive_transcript", lambda call_id: None)
+    monkeypatch.setattr("routes.company.grade_transcript", lambda _t: pytest.fail("graded a missing transcript"))
+    response = await client.get(f"/api/company/interviews/{own['id']}/evaluate-transcript", headers=company_headers())
+    assert response.status_code == 409
+    assert db.tables["interviews"][0]["ai_evaluation"] is None
+
+
+async def test_evaluate_failed_transcript_retrieval_is_409(client, db, monkeypatch):
+    add_company(db)
+    own = add_interview(db, call_id="call_1", status="Completed")
+    monkeypatch.setattr("routes.company.retrive_transcript", lambda call_id: "Failed to retrieve transcript")
+    monkeypatch.setattr("routes.company.grade_transcript", lambda _t: pytest.fail("graded a missing transcript"))
+    response = await client.get(f"/api/company/interviews/{own['id']}/evaluate-transcript", headers=company_headers())
+    assert response.status_code == 409
+    assert db.tables["interviews"][0]["ai_evaluation"] is None
+
+
+async def test_evaluate_grading_failure_is_502_without_leaking_upstream_text(client, db, monkeypatch):
+    add_company(db)
+    own = add_interview(db, call_id="call_1", status="Completed")
+    monkeypatch.setattr("routes.company.retrive_transcript", lambda call_id: "AI: hi")
+
+    def failing_grade(_transcript):
+        raise RuntimeError("OpenAI rate limit exceeded: super secret upstream detail")
+
+    monkeypatch.setattr("routes.company.grade_transcript", failing_grade)
+    response = await client.get(f"/api/company/interviews/{own['id']}/evaluate-transcript", headers=company_headers())
+    assert response.status_code == 502
+    assert "super secret upstream detail" not in response.json()["detail"]
+
+
 async def test_magic_link_endpoints_are_removed(client, db):
     add_company(db)
     own = add_interview(db)
@@ -90,3 +124,14 @@ async def test_create_interview_lowercases_email(client, db):
     assert response.status_code == 200
     assert db.tables["interviews"][0]["candidate_email"] == "ada@example.com"
     assert db.tables["interviews"][0]["company_id"] == ACME_ID
+
+
+async def test_create_interview_without_email_stores_none(client, db):
+    add_company(db)
+    response = await client.post(
+        "/api/company/interviews",
+        headers=company_headers(),
+        data={"candidate_name": "Ada", "candidate_phone": "+15555550123"},
+    )
+    assert response.status_code == 200
+    assert db.tables["interviews"][0]["candidate_email"] is None

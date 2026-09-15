@@ -155,7 +155,7 @@ async def create_company_interview(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "status": "Pending",
         "candidate_name": candidate_name,
-        "candidate_email": candidate_email.strip().lower(),
+        "candidate_email": candidate_email.strip().lower() or None,
         "candidate_phone": candidate_phone,
         "position": position if position else None,
         "interview_date": date.isoformat() if date else None,
@@ -396,8 +396,22 @@ async def evaluate_interview_transcript(
         raise HTTPException(status_code=409, detail="This interview has no recorded call yet.")
 
     require_quota(supabase, "evaluation")
-    transcript = retrive_transcript(interview["call_id"])
-    evaluation = json.loads(grade_transcript(transcript))
+    try:
+        transcript = retrive_transcript(interview["call_id"])
+    except (RuntimeError, requests.RequestException) as exc:
+        logger.exception("Transcript retrieval failed for interview %s", interview_id)
+        raise HTTPException(
+            status_code=502, detail="Could not grade the interview right now. Try again later."
+        ) from exc
+    if not transcript or transcript == "Failed to retrieve transcript":
+        raise HTTPException(status_code=409, detail="The transcript isn't ready yet. Try again in a minute.")
+    try:
+        evaluation = json.loads(grade_transcript(transcript))
+    except (RuntimeError, requests.RequestException) as exc:
+        logger.exception("Transcript grading failed for interview %s", interview_id)
+        raise HTTPException(
+            status_code=502, detail="Could not grade the interview right now. Try again later."
+        ) from exc
     supabase.table("interviews").update(
         {"transcript": transcript, "ai_evaluation": evaluation}
     ).eq("id", interview_id).execute()

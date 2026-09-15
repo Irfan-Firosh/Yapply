@@ -170,9 +170,9 @@ const CandidateDashboard = () => {
     position: candidateData?.position || "Position not specified",
     company: companyName,
     phoneNumber: candidateData?.candidate_phone || "Not provided",
-    scheduledDate: "2024-01-16",
-    scheduledTime: "14:00",
-    status: "scheduled",
+    scheduledDate: candidateData?.interview_date || null,
+    scheduledTime: candidateData?.interview_time || null,
+    status: candidateData?.status || "Pending",
     duration: "45 minutes",
     instructions: [
       "Ensure you have a stable internet connection",
@@ -276,9 +276,11 @@ const CandidateDashboard = () => {
                       <div>
                         <p className='text-sm text-muted-foreground'>Date</p>
                         <p className='font-medium'>
-                          {new Date(
-                            interviewInfo.scheduledDate
-                          ).toLocaleDateString()}
+                          {interviewInfo.scheduledDate
+                            ? new Date(
+                                interviewInfo.scheduledDate
+                              ).toLocaleDateString()
+                            : "Not scheduled"}
                         </p>
                       </div>
                     </div>
@@ -288,7 +290,7 @@ const CandidateDashboard = () => {
                       <div>
                         <p className='text-sm text-muted-foreground'>Time</p>
                         <p className='font-medium'>
-                          {interviewInfo.scheduledTime}
+                          {interviewInfo.scheduledTime || "—"}
                         </p>
                       </div>
                     </div>

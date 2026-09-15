@@ -1,3 +1,20 @@
+import pytest
+
+from main import check_environment
+
+
+def test_check_environment_requires_jwt_secret(monkeypatch):
+    monkeypatch.delenv("JWT_SECRET_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="JWT_SECRET_KEY"):
+        check_environment()
+
+
+def test_check_environment_requires_parseable_daily_call_limit(monkeypatch):
+    monkeypatch.setenv("DAILY_CALL_LIMIT", "abc")
+    with pytest.raises(RuntimeError, match="DAILY_CALL_LIMIT"):
+        check_environment()
+
+
 async def test_health_ok(client):
     response = await client.get("/api/health")
     assert response.status_code == 200

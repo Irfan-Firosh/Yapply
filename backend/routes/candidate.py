@@ -28,6 +28,9 @@ class Candidate(BaseModel):
     candidate_email: str | None = None
     position: str | None = None
     candidate_phone: str
+    status: str
+    interview_date: str | None = None
+    interview_time: str | None = None
 
 
 class CandidateInDB(Candidate):
@@ -39,6 +42,8 @@ class CandidateInDB(Candidate):
 
 @router.post("/token", summary="Log in as a candidate with the interview email")
 async def login_candidate(email: Annotated[str, Form()]):
+    if not email.strip():
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No interview found for this email")
     rows = (
         supabase.table("interviews")
         .select("id")
